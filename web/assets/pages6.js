@@ -17,7 +17,7 @@ var KIND_LABEL={business:'Business',integration:'Integration',infrastructure:'In
 function kindColor(k){return KIND_COLOR[k]||'#64748b';}
 function confBadge(label){var m={confident:'b-green',likely:'b-accent',possibly:'b-amber',low:'b-tag'};return m[label]||'b-tag';}
 function confChip(c){return '<span class="badge '+confBadge(c.confidenceLabel)+'" title="confidence '+c.confidence+'">'+esc(c.confidenceLabel||'')+'</span>';}
-function noIntel(content){content.innerHTML='';content.appendChild(view([pt('Not available','This view needs the Phase 5 intelligence layer.'),el('<div class="callout warn">This repository was analyzed before the intelligence layer existed. Click <b>Analyze another repo</b> and re-analyze to unlock System Map, Product Overview, Journeys, and more. (All existing pages keep working.)</div>')]));}
+function noIntel(content){content.innerHTML='';var v=view(pt('Not available yet','Deeper product intelligence for this repository.'));v.appendChild(el('<div class="callout warn">This repository was analyzed before the intelligence layer existed. Click <b>Analyze another repo</b> and re-analyze to unlock the Product Overview, Capabilities, Journeys, Stories, and Tour. Everything else keeps working.</div>'));v.appendChild(el('<div style="margin-top:12px"><button class="btn sm" onclick="document.getElementById(\'new-repo-btn\').click()">Re-analyze this repository</button></div>'));content.appendChild(v);}
 
 // ============ shared: capability card ============
 function capCard(c,opts){

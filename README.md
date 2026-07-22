@@ -302,3 +302,45 @@ Scorecard, and Beginner Mode. All Phase 1-4 pages unchanged (37/37 render OK).
 Validated on real repos: HRMS → full-stack HR app (Payroll/Attendance/Leave/
 Employee, HR Operations Cycle journey, salary→Payroll intent); Flask → correctly
 reported as technical/library code with no invented product features.
+
+## Phase 6 — Product Consolidation & UX Excellence (additive)
+
+Phase 6 is a refinement phase, not a feature expansion. It turns a collection of
+37 powerful tools into one coherent product around a single mission: **help a
+developer understand any unfamiliar repository as fast and accurately as
+possible.** Nothing was removed; every prior route still works. The *visible*
+surface was dramatically simplified.
+
+One front door, four experiences. The sidebar now leads with **Home** and the
+flagship **Repository Map**, then groups everything into the four questions a
+newcomer actually asks:
+- **Understand** — Overview, Architecture, Capabilities, Health & Quality
+- **Explore** — Files, Functions, Classes, API Explorer, Database, Dependencies
+- **Explain** — AI Assistant, Guided Tour, Beginner Mode, System Stories, Ask
+- **Trace** — Business Flows, User Journeys, Trace & Impact, Security, Compare
+
+Advanced/duplicate tools (Semantic Graph, Dependency Graph, Insights, Timeline,
+Time Machine, Scorecard, Classic Dashboard, the internal "Knowledge Store"...)
+stay fully functional but move off the primary nav into a **command palette**.
+
+Highlights:
+- **Redesigned Home** answers in ~10 seconds: what the project is, how big, how
+  healthy (animated ring), how it's organized, its top capabilities, quick
+  actions, and a suggested place to start.
+- **Repository Map** — the flagship. ONE graph, MANY lenses (Business /
+  Technical / API / Database / Infrastructure / Security). Same repository, a
+  different perspective per lens, instead of four separate graph pages.
+- **Command palette** (Cmd/Ctrl-K) jumps to any page, file, function, or table.
+- **Hidden internal jargon** — "Repository Brain / Semantic Layer / Embedding
+  Index" are presented as user concepts (Knowledge Store, Search, the Map).
+- **Premium polish** — refined typography/spacing, soft card depth, hover lift,
+  page transitions, focus-visible states, skeleton/loading, an onboarding coach,
+  a responsive collapsible sidebar, and ARIA roles/labels for keyboard users.
+- **Graceful degradation** — repositories analyzed before the intelligence layer
+  still get a polished Home, Map fallback, and clear empty states (no crashes).
+
+New web module `web/assets/pages7.js` (Home, Repository Map, command palette,
+onboarding) plus consolidated navigation in `app.js` and a large additive CSS
+polish pass. Backend unchanged. Validated in-browser: 38/38 routes render, lenses
+switch live, command palette resolves real symbols, and a no-intel repo degrades
+cleanly.

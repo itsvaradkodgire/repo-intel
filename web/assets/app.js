@@ -64,10 +64,12 @@ function loadIndex(id){
     document.getElementById('landing').style.display='none';
     document.getElementById('app').classList.add('on');
     var name=(D.source&&D.source.input)||D.manifest.root;
-    document.getElementById('brand-name').textContent=baseName(name.replace(/\.git$/,''));
+    var repoName=baseName(name.replace(/\.git$/,''));
+    document.getElementById('brand-name').textContent=repoName;
+    var bi=document.querySelector('#brand .badge-ic');if(bi)bi.textContent=(repoName[0]||'R').toUpperCase();
     document.getElementById('brand-meta').textContent=D.languages.slice(0,3).map(function(l){return l.label;}).join(' · ')+' · '+num(D.manifest.counts.loc)+' LOC';
     buildNav();setupSearch();
-    if(!location.hash||location.hash==='#')location.hash=(D.intel&&D.intel.systemMap)?'#/system':'#/dashboard';
+    if(!location.hash||location.hash==='#')location.hash='#/home';
     render();
   });
 }
@@ -93,73 +95,93 @@ function current(){var hash=location.hash.replace(/^#\/?/,'')||'dashboard';var p
 function render(){
   if(!D)return;
   var r=current();var content=document.getElementById('content');content.scrollTop=0;
+  // active nav: exact page match, plus keep the parent experience visually anchored
+  var expByPage={};NAV.forEach(function(n){if(n.page&&n.exp)expByPage[n.page]=n.exp;});
+  var curExp=expByPage[r.page];
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.toggle('active',n.dataset.page===r.page);});
-  var fn=routes[r.page]||routes.dashboard;
+  document.querySelectorAll('.nav-sec').forEach(function(s){s.classList.remove('exp-on');});
+  var fn=routes[r.page]||routes.home||routes.dashboard;
   try{fn(content,r.arg?decodeURIComponent(r.arg):'');}
   catch(err){content.innerHTML='<div class="view"><div class="callout danger">Render error: '+esc(err.message)+'<br><pre>'+esc(err.stack||'')+'</pre></div></div>';}
   setCrumbs(r);
+  var mainEl=document.getElementById('sidebar');if(mainEl)mainEl.classList.remove('open');
 }
 function setCrumbs(r){
-  var labels={dashboard:'Dashboard',architecture:'Architecture',files:'Files',functions:'Functions',classes:'Classes',apis:'API Explorer',database:'Database',flows:'Business Flows',graph:'Dependency Graph',quality:'Code Quality',security:'Security',deps:'Dependencies',ai:'AI Assistant',settings:'Settings',compare:'Compare',semantic:'Modules & Domains',health:'Repository Health',overview:'AI Overview',learn:'Learn Repository',trace:'Trace & Impact',commit:'Commit Intelligence',sgraph:'Semantic Graph',timemachine:'Time Machine',brain:'Repository Brain',search:'Semantic Search',insights:'Repository Insights',timeline:'Graph Timeline',system:'System Map',product:'Product Overview',capmap:'Capability Map',journeys:'User Journeys',stories:'System Stories',tour:'Guided Tour',ask:'Ask the Repo',scorecard:'Product Scorecard',beginner:'Beginner Mode'};
+  var labels={home:'Home',map:'Repository Map',dashboard:'Dashboard',architecture:'Architecture',files:'Files',functions:'Functions',classes:'Classes',apis:'API Explorer',database:'Database',flows:'Business Flows',graph:'Dependency Graph',quality:'Code Quality',security:'Security',deps:'Dependencies',ai:'AI Assistant',settings:'Settings',compare:'Compare',semantic:'Modules & Domains',health:'Health & Quality',overview:'AI Overview',learn:'Learn Repository',trace:'Trace & Impact',commit:'Commit Intelligence',sgraph:'Semantic Graph',timemachine:'Time Machine',brain:'Knowledge Store',search:'Semantic Search',insights:'Insights',timeline:'Timeline',system:'System Map',product:'Overview',capmap:'Capabilities',journeys:'User Journeys',stories:'System Stories',tour:'Guided Tour',ask:'Ask a Question',scorecard:'Product Scorecard',beginner:'Beginner Mode'};
   var label=labels[r.page]||r.page;
-  var html='<span class="c-link" onclick="RINAV(\'dashboard\')">Home</span> / '+esc(label);
-  if(r.arg)html+=' / <span class="mono">'+esc(baseName(decodeURIComponent(r.arg)))+'</span>';
+  var html='<span class="c-link crumb" onclick="RINAV(\'home\')">Home</span>'+(r.page!=='home'?' <span style="color:var(--faint2)">/</span> '+esc(label):'');
+  if(r.arg)html+=' <span style="color:var(--faint2)">/</span> <span class="mono">'+esc(baseName(decodeURIComponent(r.arg)))+'</span>';
   document.getElementById('crumbs').innerHTML=html;
 }
 window.addEventListener('hashchange',render);
 
-// ---- nav ----
+// ---- nav (Phase 6: four experiences + Home + Repository Map) ----
+// Primary items are always visible. Each experience groups the pages that serve
+// one of the five understanding questions. Every legacy route stays registered
+// and reachable (via these groups or the command palette / search).
 var NAV=[
-  {sec:'Product Intelligence'},
-  {page:'system',label:'System Map',ic:'\u25C9'},
-  {page:'product',label:'Product Overview',ic:'\u2637'},
-  {page:'capmap',label:'Capability Map',ic:'\u25F0'},
-  {page:'journeys',label:'User Journeys',ic:'\u2933'},
-  {page:'stories',label:'System Stories',ic:'\u25C8'},
-  {page:'tour',label:'Guided Tour',ic:'\u25B6'},
-  {page:'ask',label:'Ask the Repo',ic:'\u2315'},
-  {page:'scorecard',label:'Product Scorecard',ic:'\u2691'},
-  {page:'beginner',label:'Beginner Mode',ic:'\u2609'},
-  {sec:'Overview'},
-  {page:'dashboard',label:'Dashboard',ic:'\u25A0'},
-  {page:'brain',label:'Repository Brain',ic:'\u25C9'},
+  {page:'home',label:'Home',ic:'\u2302'},
+  {page:'map',label:'Repository Map',ic:'\u25C9',flag:true},
+  {sec:'Understand',exp:'understand',hint:'What is this? How is it built?'},
+  {page:'product',label:'Overview',ic:'\u2637',exp:'understand'},
+  {page:'architecture',label:'Architecture',ic:'\u25F0',exp:'understand'},
+  {page:'capmap',label:'Capabilities',ic:'\u25C8',exp:'understand'},
+  {page:'health',label:'Health & Quality',ic:'\u2665',exp:'understand'},
+  {sec:'Explore',exp:'explore',hint:'Find your way around'},
+  {page:'files',label:'Files',ic:'\u25B8',exp:'explore',count:function(){return D.manifest.counts.files;}},
+  {page:'functions',label:'Functions',ic:'\u0192',exp:'explore',count:function(){return D.manifest.counts.functions;}},
+  {page:'classes',label:'Classes / Types',ic:'{}',exp:'explore',count:function(){return D.manifest.counts.classes;}},
+  {page:'apis',label:'API Explorer',ic:'\u21C4',exp:'explore',count:function(){return D.manifest.counts.routes;}},
+  {page:'database',label:'Database',ic:'\u25A4',exp:'explore',count:function(){return D.manifest.counts.tables;}},
+  {page:'deps',label:'Dependencies',ic:'\u25C8',exp:'explore',count:function(){return D.manifest.counts.dependencies;}},
+  {sec:'Explain',exp:'explain',hint:'Have it explained to you'},
+  {page:'ai',label:'AI Assistant',ic:'\u2727',exp:'explain'},
+  {page:'tour',label:'Guided Tour',ic:'\u25B6',exp:'explain'},
+  {page:'beginner',label:'Beginner Mode',ic:'\u2609',exp:'explain'},
+  {page:'stories',label:'System Stories',ic:'\u25C8',exp:'explain'},
+  {page:'ask',label:'Ask a Question',ic:'\u2315',exp:'explain'},
+  {sec:'Trace',exp:'trace',hint:'Follow flows & impact'},
+  {page:'flows',label:'Business Flows',ic:'\u2933',exp:'trace',count:function(){return D.flows.length;}},
+  {page:'journeys',label:'User Journeys',ic:'\u2933',exp:'trace'},
+  {page:'trace',label:'Trace & Impact',ic:'\u2325',exp:'trace'},
+  {page:'security',label:'Security',ic:'\u26E8',exp:'trace',count:function(){return D.security.length;}},
+  {page:'compare',label:'Compare Versions',ic:'\u21C5',exp:'trace'}
+];
+// Secondary/advanced routes: fully working, reachable via command palette (Cmd-K)
+// and search, but kept out of the primary nav to reduce clutter.
+var NAV_ADVANCED=[
   {page:'search',label:'Semantic Search',ic:'\u2315'},
-  {page:'architecture',label:'Architecture',ic:'\u25C9'},
-  {page:'sgraph',label:'Semantic Graph',ic:'\u2b21'},
   {page:'graph',label:'Dependency Graph',ic:'\u2b23'},
-  {sec:'Explore'},
-  {page:'files',label:'Files',ic:'\u25B8',count:function(){return D.manifest.counts.files;}},
-  {page:'functions',label:'Functions',ic:'\u0192',count:function(){return D.manifest.counts.functions;}},
-  {page:'classes',label:'Classes / Types',ic:'{}',count:function(){return D.manifest.counts.classes;}},
-  {page:'apis',label:'API Explorer',ic:'\u21C4',count:function(){return D.manifest.counts.routes;}},
-  {page:'database',label:'Database',ic:'\u25A4',count:function(){return D.manifest.counts.tables;}},
-  {page:'deps',label:'Dependencies',ic:'\u25C8',count:function(){return D.manifest.counts.dependencies;}},
-  {sec:'Understand'},
-  {page:'flows',label:'Business Flows',ic:'\u2933',count:function(){return D.flows.length;}},
-  {page:'semantic',label:'Modules & Domains',ic:'\u25F0',count:function(){return D.semantic?D.semantic.domains.length:0;}},
-  {page:'insights',label:'Repository Insights',ic:'\u2691'},
-  {page:'timeline',label:'Graph Timeline',ic:'\u29D6'},
-  {page:'health',label:'Repository Health',ic:'\u2665'},
-  {page:'quality',label:'Code Quality',ic:'\u2691'},
-  {page:'security',label:'Security',ic:'\u26E8',count:function(){return D.security.length;}},
-  {page:'compare',label:'Compare Versions',ic:'\u21C5'},
-  {page:'timemachine',label:'Time Machine',ic:'\u29D6'},
-  {sec:'AI Intelligence'},
-  {page:'ai',label:'AI Assistant',ic:'\u2727'},
+  {page:'sgraph',label:'Semantic Graph',ic:'\u2b21'},
+  {page:'semantic',label:'Modules & Domains',ic:'\u25F0'},
   {page:'overview',label:'AI Overview',ic:'\u2637'},
   {page:'learn',label:'Learn Repository',ic:'\u25C8'},
-  {page:'trace',label:'Trace &amp; Impact',ic:'\u2325'},
   {page:'commit',label:'Commit Intelligence',ic:'\u2338'},
+  {page:'scorecard',label:'Product Scorecard',ic:'\u2691'},
+  {page:'insights',label:'Insights',ic:'\u2691'},
+  {page:'timeline',label:'Timeline',ic:'\u29D6'},
+  {page:'timemachine',label:'Time Machine',ic:'\u29D6'},
+  {page:'quality',label:'Code Quality',ic:'\u2691'},
+  {page:'dashboard',label:'Classic Dashboard',ic:'\u25A0'},
+  {page:'brain',label:'Knowledge Store',ic:'\u25C9'},
   {page:'settings',label:'AI Settings',ic:'\u2699'}
 ];
+window.RI_NAV_ADVANCED=NAV_ADVANCED;
+var EXP_COLLAPSE={};
 function buildNav(){
   var nav=document.getElementById('nav');nav.innerHTML='';
   NAV.forEach(function(n){
-    if(n.sec){nav.appendChild(h('div',{class:'nav-sec',text:n.sec}));return;}
+    if(n.sec){nav.appendChild(h('div',{class:'nav-sec',title:n.hint||'',text:n.sec}));return;}
+    var cls='nav-item'+(n.flag?' flag':'');
     var kids=[h('span',{class:'ic',text:n.ic}),h('span',{text:n.label})];
     if(n.count){try{kids.push(h('span',{class:'ct',text:num(n.count())}));}catch(e){}}
-    nav.appendChild(h('div',{class:'nav-item','data-page':n.page,onclick:function(){window.RINAV(n.page);}},kids));
+    var item=h('div',{class:cls,'data-page':n.page,role:'link',tabindex:'0',onclick:function(){window.RINAV(n.page);}},kids);
+    item.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();window.RINAV(n.page);}});
+    nav.appendChild(item);
   });
+  // "More tools" affordance -> opens command palette
+  var more=h('div',{class:'nav-item',style:'margin-top:6px;color:var(--faint2)',role:'button',tabindex:'0',onclick:function(){if(window.RICMDK)window.RICMDK();}},[h('span',{class:'ic',text:'\u2026'}),h('span',{text:'More tools'}),h('span',{class:'kbd',style:'margin-left:auto',text:'\u2318K'})]);
+  nav.appendChild(more);
 }
 
 // ---- search ----

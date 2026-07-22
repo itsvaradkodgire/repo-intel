@@ -32,20 +32,29 @@
 <!-- App -->
 <div id="app">
   <aside id="sidebar">
-    <div id="brand"><div class="n" id="brand-name">&mdash;</div><div class="m" id="brand-meta"></div></div>
-    <nav id="nav"></nav>
+    <div id="brand"><div class="badge-ic">R</div><div class="bx"><div class="n" id="brand-name">&mdash;</div><div class="m" id="brand-meta"></div></div></div>
+    <nav id="nav" aria-label="Primary"></nav>
     <div class="foot"><button class="btn ghost sm" style="width:100%" id="new-repo-btn">Analyze another repo</button></div>
   </aside>
   <main id="main">
     <div id="topbar">
+      <div id="menu-toggle" role="button" aria-label="Toggle menu" tabindex="0">&#9776;</div>
       <div id="crumbs"></div>
       <div id="search-wrap">
-        <input id="search" type="text" placeholder="Search everything...  (press /)" autocomplete="off" spellcheck="false"/>
+        <input id="search" type="text" placeholder="Search or ask...  (press /)" autocomplete="off" spellcheck="false" aria-label="Search"/>
         <div id="search-results"></div>
       </div>
     </div>
     <div id="content"></div>
   </main>
+</div>
+
+<!-- Command palette -->
+<div id="cmdk-overlay" role="dialog" aria-modal="true" aria-label="Command palette">
+  <div id="cmdk">
+    <input id="cmdk-input" type="text" placeholder="Jump to any page, file, function, table..." autocomplete="off" spellcheck="false"/>
+    <div id="cmdk-list"></div>
+  </div>
 </div>
 
 <script src="assets/graph.js"></script>
@@ -58,5 +67,6 @@
 <script src="assets/pages4.js"></script>
 <script src="assets/pages5.js"></script>
 <script src="assets/pages6.js"></script>
+<script src="assets/pages7.js"></script>
 </body>
 </html>
