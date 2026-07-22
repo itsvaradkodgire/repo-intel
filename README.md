@@ -344,3 +344,46 @@ onboarding) plus consolidated navigation in `app.js` and a large additive CSS
 polish pass. Backend unchanged. Validated in-browser: 38/38 routes render, lenses
 switch live, command palette resolves real symbols, and a no-intel repo degrades
 cleanly.
+
+## Phase 7 — Intelligent Graph Layout Engine (additive)
+
+Phase 7 does not add graph features; it replaces the single-pass force layout
+behind every graph with a proper **multi-stage layout pipeline** so graphs read
+like an architect's diagram instead of scattered circles. No UI redesign, no
+change to graph semantics.
+
+New module `web/assets/graph-layout.js` — a dependency-free, deterministic,
+pure-computation engine (works in the browser and in Node for testing). Pipeline:
+
+    graph → adjacency → connected components → communities (label propagation)
+          → per-component strategy selection → local layout → overlap removal
+          → component packing → center
+
+- **Connected components** are detected and laid out independently, then packed
+  with shelf packing so isolated subgraphs are never left scattered.
+- **Communities** (seeded label propagation) bias the force layout so related
+  nodes cluster.
+- **Multiple strategies** — hierarchical (Sugiyama-lite layering + barycenter
+  ordering), tree, radial/concentric, circle (BFS-ordered), and force
+  (Fruchterman-Reingold with grid-bucketed repulsion for large graphs).
+- **Metric-driven auto-selection** — for each component the engine runs the
+  plausible strategies, scores them by edge crossings + edge-length consistency,
+  and keeps the best. Small graphs get extra force restarts to escape local
+  minima.
+- **Overlap removal** (radius-aware, spatial-hash) eliminates node overlaps.
+- **Node importance** (degree + PageRank) is computed and exposed.
+- **Layout stability** — each node is seeded from its own id hash, so the same
+  repository yields an identical layout across analyses and small changes only
+  rearrange locally.
+
+The renderer (`graph.js`) was rewired to consume the pipeline and gained:
+**curved edges**, **smart labels** (level-of-detail + collision hiding that
+prioritizes important nodes and reveals more on zoom / hover / focus), **animated
+transitions** between layouts/lenses, and a **focus / fit-selection / highlight**
+interaction API. The hand-tuned layered Architecture view is preserved unchanged.
+
+Objectively validated with a Node harness (`layout-bench.cjs`) that scores the
+new pipeline vs the old force layout on 22 real graphs from analyzed repos:
+**22% fewer edge crossings on readable graphs, 100% of node overlaps eliminated
+(192 → 0), 9 graphs improved / 13 tied / 0 worse, and fully deterministic**
+(identical input → identical layout). All 32 pages still render.
