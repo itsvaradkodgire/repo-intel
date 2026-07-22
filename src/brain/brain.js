@@ -30,7 +30,7 @@ import { snapshotHashes, diffSnapshots, reparse, hashesFromSnapshot } from './in
 const CACHE_ROOT = process.env.REPO_INTEL_CACHE || path.join(os.homedir(), '.repo-intel-cache');
 const BRAIN_ROOT = path.join(CACHE_ROOT, 'brain');
 
-function brainDir(id){ return path.join(BRAIN_ROOT, id); }
+function brainDir(id){ if(!id || typeof id !== 'string') return null; return path.join(BRAIN_ROOT, id); }
 function readJson(p){ try { return JSON.parse(fs.readFileSync(p,'utf8')); } catch { return null; } }
 function writeJson(p, obj){ try { fs.mkdirSync(path.dirname(p),{recursive:true}); fs.writeFileSync(p, JSON.stringify(obj)); } catch {} }
 
@@ -80,6 +80,7 @@ export async function initBrain(id, index, dir){
 export function loadBrain(id){
   if(LOADED.has(id)) return LOADED.get(id);
   const dbase = brainDir(id);
+  if(!dbase) return null;
   const index = readJson(path.join(dbase,'index.json'));
   if(!index) return null;
   const brain = {

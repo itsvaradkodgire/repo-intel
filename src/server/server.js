@@ -243,6 +243,7 @@ function brainDirFor(id) { const c = CACHE.get(id); if (c && c.dir) return c.dir
 async function handleBrain(req, res) {
   const url = new URL(req.url, 'http://localhost');
   const id = url.searchParams.get('id');
+  if (!id) return send(res, 400, { error: 'id query param required' });
   let brain = loadBrain(id);
   if (!brain) {
     const idx = getCached(id);
@@ -255,6 +256,7 @@ async function handleBrain(req, res) {
 async function handleBrainSearch(req, res) {
   const body = await readBody(req);
   const { id, query, limit } = body;
+  if (!id) return send(res, 400, { error: 'id required' });
   if (!getCached(id)) return send(res, 404, { error: 'index not found' });
   if (!loadBrain(id)) await initBrain(id, getCached(id), brainDirFor(id));
   return send(res, 200, brainSearch(id, query || '', { limit: limit || 24 }));
@@ -262,6 +264,7 @@ async function handleBrainSearch(req, res) {
 async function handleBrainInsights(req, res) {
   const url = new URL(req.url, 'http://localhost');
   const id = url.searchParams.get('id');
+  if (!id) return send(res, 400, { error: 'id query param required' });
   if (!getCached(id)) return send(res, 404, { error: 'index not found' });
   if (!loadBrain(id)) await initBrain(id, getCached(id), brainDirFor(id));
   const ins = getInsights(id);
@@ -270,6 +273,7 @@ async function handleBrainInsights(req, res) {
 async function handleBrainTimeline(req, res) {
   const url = new URL(req.url, 'http://localhost');
   const id = url.searchParams.get('id');
+  if (!id) return send(res, 400, { error: 'id query param required' });
   const dir = brainDirFor(id);
   if (!dir) return send(res, 404, { error: 'repo working dir not available (needs a git clone)' });
   const tl = await getTimeline(id, dir);
@@ -278,6 +282,7 @@ async function handleBrainTimeline(req, res) {
 async function handleBrainReindex(req, res) {
   const body = await readBody(req);
   const { id } = body;
+  if (!id) return send(res, 400, { error: 'id required' });
   const dir = brainDirFor(id);
   if (!dir) return send(res, 404, { error: 'repo working dir not available' });
   if (!loadBrain(id)) { const idx = getCached(id); if (!idx) return send(res, 404, { error: 'index not found' }); await initBrain(id, idx, dir); }
@@ -289,18 +294,21 @@ async function handleBrainReindex(req, res) {
 async function handleBrainMemory(req, res) {
   const url = new URL(req.url, 'http://localhost');
   const id = url.searchParams.get('id');
+  if (!id) return send(res, 400, { error: 'id query param required' });
   if (req.method === 'DELETE') return send(res, 200, clearMemory(id));
   return send(res, 200, { memory: memoryList(id), history: getHistory(id).slice(-60) });
 }
 async function handleBrainSimilar(req, res) {
   const url = new URL(req.url, 'http://localhost');
   const id = url.searchParams.get('id');
+  if (!id) return send(res, 400, { error: 'id query param required' });
   if (!loadBrain(id)) { const idx = getCached(id); if (idx) await initBrain(id, idx, brainDirFor(id)); }
   return send(res, 200, brainSimilar(id, url.searchParams.get('node'), Number(url.searchParams.get('limit')) || 10));
 }
 async function handleBrainPlugins(req, res) {
   const url = new URL(req.url, 'http://localhost');
   const id = url.searchParams.get('id');
+  if (!id) return send(res, 400, { error: 'id query param required' });
   if (!loadBrain(id)) { const idx = getCached(id); if (idx) await initBrain(id, idx, brainDirFor(id)); }
   const pl = getPlugins(id);
   return pl ? send(res, 200, pl) : send(res, 404, { error: 'plugins unavailable' });
@@ -341,7 +349,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   const p = url.pathname;
   try {
-    if (req.method === 'POST' && p === '/api/analyze') return handleAnalyze(req, res);
+    if (req.method === 'POST' && p === '/api/analyze') return await handleAnalyze(req, res);
     if (req.method === 'GET' && p.startsWith('/api/index/')) {
       const index = getCached(p.split('/').pop());
       return index ? send(res, 200, index) : send(res, 404, { error: 'not found' });
@@ -352,24 +360,24 @@ const server = http.createServer(async (req, res) => {
       if (!entry || !entry.dir) return send(res, 404, { error: 'repo not cached' });
       return send(res, 200, await gitRefs(entry.dir));
     }
-    if (req.method === 'POST' && p === '/api/compare') return handleCompare(req, res);
+    if (req.method === 'POST' && p === '/api/compare') return await handleCompare(req, res);
     if (req.method === 'GET' && p === '/api/providers') return send(res, 200, { providers: PROVIDER_PRESETS });
-    if (req.method === 'POST' && p === '/api/ai/models') return handleAiModels(req, res);
-    if (req.method === 'POST' && p === '/api/ai/test') return handleAiTest(req, res);
-    if (req.method === 'POST' && p === '/api/ai/chat') return handleAiChat(req, res);
-    if (req.method === 'POST' && p === '/api/ai/generate') return handleAiGenerate(req, res);
-    if (req.method === 'POST' && p === '/api/ai/graph') return handleAiGraph(req, res);
-    if (req.method === 'GET' && p === '/api/impact') return handleImpact(req, res);
-    if (req.method === 'GET' && p === '/api/trace') return handleTrace(req, res);
-    if (req.method === 'POST' && p === '/api/commit-intel') return handleCommitIntel(req, res);
-    if (req.method === 'GET' && p === '/api/brain') return handleBrain(req, res);
-    if (req.method === 'POST' && p === '/api/brain/search') return handleBrainSearch(req, res);
-    if (req.method === 'GET' && p === '/api/brain/insights') return handleBrainInsights(req, res);
-    if (req.method === 'GET' && p === '/api/brain/timeline') return handleBrainTimeline(req, res);
-    if (req.method === 'POST' && p === '/api/brain/reindex') return handleBrainReindex(req, res);
-    if ((req.method === 'GET' || req.method === 'DELETE') && p === '/api/brain/memory') return handleBrainMemory(req, res);
-    if (req.method === 'GET' && p === '/api/brain/similar') return handleBrainSimilar(req, res);
-    if (req.method === 'GET' && p === '/api/brain/plugins') return handleBrainPlugins(req, res);
+    if (req.method === 'POST' && p === '/api/ai/models') return await handleAiModels(req, res);
+    if (req.method === 'POST' && p === '/api/ai/test') return await handleAiTest(req, res);
+    if (req.method === 'POST' && p === '/api/ai/chat') return await handleAiChat(req, res);
+    if (req.method === 'POST' && p === '/api/ai/generate') return await handleAiGenerate(req, res);
+    if (req.method === 'POST' && p === '/api/ai/graph') return await handleAiGraph(req, res);
+    if (req.method === 'GET' && p === '/api/impact') return await handleImpact(req, res);
+    if (req.method === 'GET' && p === '/api/trace') return await handleTrace(req, res);
+    if (req.method === 'POST' && p === '/api/commit-intel') return await handleCommitIntel(req, res);
+    if (req.method === 'GET' && p === '/api/brain') return await handleBrain(req, res);
+    if (req.method === 'POST' && p === '/api/brain/search') return await handleBrainSearch(req, res);
+    if (req.method === 'GET' && p === '/api/brain/insights') return await handleBrainInsights(req, res);
+    if (req.method === 'GET' && p === '/api/brain/timeline') return await handleBrainTimeline(req, res);
+    if (req.method === 'POST' && p === '/api/brain/reindex') return await handleBrainReindex(req, res);
+    if ((req.method === 'GET' || req.method === 'DELETE') && p === '/api/brain/memory') return await handleBrainMemory(req, res);
+    if (req.method === 'GET' && p === '/api/brain/similar') return await handleBrainSimilar(req, res);
+    if (req.method === 'GET' && p === '/api/brain/plugins') return await handleBrainPlugins(req, res);
     if (req.method === 'GET') return serveStatic(req, res, p);
     return send(res, 404, { error: 'not found' });
   } catch (e) {
@@ -378,6 +386,13 @@ const server = http.createServer(async (req, res) => {
 });
 
 const PORT = process.env.PORT || 4477;
+// Safety nets: a single bad request must never take down the platform.
+process.on('unhandledRejection', (err) => {
+  console.error('[unhandledRejection]', err && err.stack || err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err && err.stack || err);
+});
 server.listen(PORT, () => {
   console.log(`\n  Repository Intelligence Platform`);
   console.log(`  → http://localhost:${PORT}\n`);
