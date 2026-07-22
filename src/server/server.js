@@ -28,6 +28,8 @@ import { buildChatMessages } from '../ai/context-builder.js';
 import { overviewMessages, mentorStepMessages, explainMessages, commitMessages, graphStoryMessages, graphNodeMessages } from '../ai/generators.js';
 import { impactOfFile, impactOfFunction, impactOfTable, traceData, traceRequest, traceFlow } from '../analyzer/trace.js';
 import { initBrain, loadBrain, brainSummary, brainSearch, brainSimilar, getInsights, getTimeline, reindex, getHistory, memoryList, clearMemory, getPlugins } from '../brain/brain.js';
+import { answerIntent, conversationalMap } from '../intel/intent.js';
+import { productOverviewMessages, systemStoryMessages, tourStopMessages, journeyMessages, whyEdgeMessages, intentNarrativeMessages, scorecardMessages } from '../ai/intel-generators.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIR = path.resolve(__dirname, '../../web');
@@ -237,6 +239,68 @@ async function handleTrace(req, res) {
   return result ? send(res, 200, result) : send(res, 404, { error: 'trace target not found' });
 }
 
+// ---- Phase 5: Intent & Business Intelligence endpoints ----
+async function handleIntel(req, res) {
+  const url = new URL(req.url, 'http://localhost');
+  const id = url.searchParams.get('id');
+  if (!id) return send(res, 400, { error: 'id query param required' });
+  const index = getCached(id);
+  if (!index) return send(res, 404, { error: 'index not found' });
+  if (!index.intel) return send(res, 404, { error: 'intel not available (re-analyze to build the intelligence layer)' });
+  const section = url.searchParams.get('section');
+  if (section && index.intel[section] !== undefined) return send(res, 200, index.intel[section]);
+  return send(res, 200, index.intel);
+}
+
+async function handleIntelQuery(req, res) {
+  const body = await readBody(req);
+  const { id, query, mode } = body;
+  if (!id) return send(res, 400, { error: 'id required' });
+  const index = getCached(id);
+  if (!index) return send(res, 404, { error: 'index not found' });
+  if (!index.intel) return send(res, 404, { error: 'intel not available' });
+  if (!query || !query.trim()) return send(res, 400, { error: 'query required' });
+  const intel = index.intel;
+  if (mode === 'map') {
+    return send(res, 200, conversationalMap(index, intel.capabilities, intel.systemMap, query));
+  }
+  return send(res, 200, answerIntent(index, intel.capabilities, intel.systemMap, query));
+}
+
+async function handleAiIntel(req, res) {
+  const body = await readBody(req);
+  const { id, kind, config } = body;
+  const index = getCached(id);
+  if (!index) return send(res, 404, { error: 'index not found' });
+  if (!index.intel) return send(res, 404, { error: 'intel not available' });
+  if (!config || !config.model) return send(res, 400, { error: 'AI not configured' });
+  const intel = index.intel;
+  let messages, cacheParts = null;
+  if (kind === 'product') { messages = productOverviewMessages(intel); }
+  else if (kind === 'story') { messages = systemStoryMessages(intel, body.systemId); cacheParts = ['intel-story', body.systemId, config.model]; }
+  else if (kind === 'tour') { messages = tourStopMessages(intel, body.systemId); cacheParts = ['intel-tour', body.systemId, config.model]; }
+  else if (kind === 'journey') { messages = journeyMessages(intel, body.journeyId); cacheParts = ['intel-journey', body.journeyId, config.model]; }
+  else if (kind === 'why') { messages = whyEdgeMessages(intel, body.source, body.target); cacheParts = ['intel-why', body.source, body.target, config.model]; }
+  else if (kind === 'scorecard') { messages = scorecardMessages(intel); }
+  else if (kind === 'intent') {
+    const result = answerIntent(index, intel.capabilities, intel.systemMap, body.query || '');
+    messages = intentNarrativeMessages(intel, result);
+  } else return send(res, 400, { error: 'unknown intel kind' });
+  if (!messages) return send(res, 404, { error: 'intel subject not found' });
+  if (cacheParts) {
+    const cached = brainGet(id, cacheParts);
+    if (cached) { sseInit(res); sseSend(res, 'delta', { text: cached }); sseSend(res, 'cached', { cached: true }); sseSend(res, 'done', {}); return res.end(); }
+  }
+  sseInit(res);
+  let acc = '';
+  try {
+    await chat({ ...config, stream: true, maxTokens: config.maxTokens || 1200 }, messages, (d) => { acc += d; sseSend(res, 'delta', { text: d }); });
+    if (cacheParts && acc.trim()) brainPut(id, cacheParts, acc);
+    sseSend(res, 'done', {});
+  } catch (e) { sseSend(res, 'error', { message: e.message }); }
+  res.end();
+}
+
 // ---- Phase 4: Repository Brain endpoints ----
 function brainDirFor(id) { const c = CACHE.get(id); if (c && c.dir) return c.dir; const idx = getCached(id); return idx && idx.source && idx.source.brainDir; }
 
@@ -378,6 +442,9 @@ const server = http.createServer(async (req, res) => {
     if ((req.method === 'GET' || req.method === 'DELETE') && p === '/api/brain/memory') return await handleBrainMemory(req, res);
     if (req.method === 'GET' && p === '/api/brain/similar') return await handleBrainSimilar(req, res);
     if (req.method === 'GET' && p === '/api/brain/plugins') return await handleBrainPlugins(req, res);
+    if (req.method === 'GET' && p === '/api/intel') return await handleIntel(req, res);
+    if (req.method === 'POST' && p === '/api/intel/query') return await handleIntelQuery(req, res);
+    if (req.method === 'POST' && p === '/api/ai/intel') return await handleAiIntel(req, res);
     if (req.method === 'GET') return serveStatic(req, res, p);
     return send(res, 404, { error: 'not found' });
   } catch (e) {

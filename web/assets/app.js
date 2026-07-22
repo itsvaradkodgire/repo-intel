@@ -67,7 +67,7 @@ function loadIndex(id){
     document.getElementById('brand-name').textContent=baseName(name.replace(/\.git$/,''));
     document.getElementById('brand-meta').textContent=D.languages.slice(0,3).map(function(l){return l.label;}).join(' · ')+' · '+num(D.manifest.counts.loc)+' LOC';
     buildNav();setupSearch();
-    if(!location.hash||location.hash==='#')location.hash='#/dashboard';
+    if(!location.hash||location.hash==='#')location.hash=(D.intel&&D.intel.systemMap)?'#/system':'#/dashboard';
     render();
   });
 }
@@ -100,7 +100,7 @@ function render(){
   setCrumbs(r);
 }
 function setCrumbs(r){
-  var labels={dashboard:'Dashboard',architecture:'Architecture',files:'Files',functions:'Functions',classes:'Classes',apis:'API Explorer',database:'Database',flows:'Business Flows',graph:'Dependency Graph',quality:'Code Quality',security:'Security',deps:'Dependencies',ai:'AI Assistant',settings:'Settings',compare:'Compare',semantic:'Modules & Domains',health:'Repository Health',overview:'AI Overview',learn:'Learn Repository',trace:'Trace & Impact',commit:'Commit Intelligence',sgraph:'Semantic Graph',timemachine:'Time Machine',brain:'Repository Brain',search:'Semantic Search',insights:'Repository Insights',timeline:'Graph Timeline'};
+  var labels={dashboard:'Dashboard',architecture:'Architecture',files:'Files',functions:'Functions',classes:'Classes',apis:'API Explorer',database:'Database',flows:'Business Flows',graph:'Dependency Graph',quality:'Code Quality',security:'Security',deps:'Dependencies',ai:'AI Assistant',settings:'Settings',compare:'Compare',semantic:'Modules & Domains',health:'Repository Health',overview:'AI Overview',learn:'Learn Repository',trace:'Trace & Impact',commit:'Commit Intelligence',sgraph:'Semantic Graph',timemachine:'Time Machine',brain:'Repository Brain',search:'Semantic Search',insights:'Repository Insights',timeline:'Graph Timeline',system:'System Map',product:'Product Overview',capmap:'Capability Map',journeys:'User Journeys',stories:'System Stories',tour:'Guided Tour',ask:'Ask the Repo',scorecard:'Product Scorecard',beginner:'Beginner Mode'};
   var label=labels[r.page]||r.page;
   var html='<span class="c-link" onclick="RINAV(\'dashboard\')">Home</span> / '+esc(label);
   if(r.arg)html+=' / <span class="mono">'+esc(baseName(decodeURIComponent(r.arg)))+'</span>';
@@ -110,6 +110,16 @@ window.addEventListener('hashchange',render);
 
 // ---- nav ----
 var NAV=[
+  {sec:'Product Intelligence'},
+  {page:'system',label:'System Map',ic:'\u25C9'},
+  {page:'product',label:'Product Overview',ic:'\u2637'},
+  {page:'capmap',label:'Capability Map',ic:'\u25F0'},
+  {page:'journeys',label:'User Journeys',ic:'\u2933'},
+  {page:'stories',label:'System Stories',ic:'\u25C8'},
+  {page:'tour',label:'Guided Tour',ic:'\u25B6'},
+  {page:'ask',label:'Ask the Repo',ic:'\u2315'},
+  {page:'scorecard',label:'Product Scorecard',ic:'\u2691'},
+  {page:'beginner',label:'Beginner Mode',ic:'\u2609'},
   {sec:'Overview'},
   {page:'dashboard',label:'Dashboard',ic:'\u25A0'},
   {page:'brain',label:'Repository Brain',ic:'\u25C9'},

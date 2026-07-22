@@ -21,6 +21,7 @@ import { computeMetrics } from './metrics.js';
 import { inferFlows } from './flows.js';
 import { buildSemantic } from './semantic.js';
 import { buildSemanticGraph } from './semantic-graph.js';
+import { buildIntel } from '../intel/intel.js';
 
 export async function analyzeRepo(dir, opts = {}) {
   const log = opts.onLog || (() => {});
@@ -168,6 +169,19 @@ export async function analyzeRepo(dir, opts = {}) {
   } catch (e) {
     log('  semantic graph failed (non-fatal): ' + e.message);
     result.semanticGraph = null;
+  }
+
+  // ---- Phase 5 (additive): intent & business intelligence ----
+  // Infers capabilities/systems, a system map + why-graph, product overview,
+  // journeys, stories, scorecard, and a guided tour. Purely mechanical; the AI
+  // layer only narrates it. Non-fatal: failure leaves index.intel = null.
+  log('Inferring product intelligence (capabilities, systems, journeys)...');
+  try {
+    result.intel = buildIntel(result);
+    log(`  detected ${result.intel.stats.systems} systems (${result.intel.stats.business} business), ${result.intel.stats.links} links, ${result.intel.stats.journeys} journeys`);
+  } catch (e) {
+    log('  intel layer failed (non-fatal): ' + e.message);
+    result.intel = null;
   }
 
   return result;

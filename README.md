@@ -250,3 +250,55 @@ New modules: `src/brain/{brain,embeddings,insights,timeline,incremental,plugins}
 New endpoints: `/api/brain`, `/api/brain/{search,insights,timeline,reindex,memory,
 similar,plugins}`. New web module `web/assets/pages5.js`. All Phase 1-3 code
 unchanged; the Brain initializes automatically right after analysis.
+
+## Phase 5 — Intent & Business Intelligence (additive)
+
+Phase 5 changes how the platform *thinks*. Phases 1-4 know WHAT exists; Phase 5
+infers WHY it exists. It stops organizing code like a filesystem (services,
+routes, utils) and instead organizes it by **intent** — the business and
+technical capabilities a product is actually built from. Fully backward
+compatible: a new mechanical layer (`index.intel`) plus new pages; nothing
+existing changed.
+
+Everything is grounded: capabilities, systems, journeys, and reasons are derived
+from real static-analysis evidence (file/dir names, function & class names, HTTP
+routes, DB tables, dependencies, env vars). The AI layer only *narrates* this
+model; it never invents features. Every conclusion carries a **confidence**
+(`confident` / `likely` / `possibly`); when evidence is missing the output says
+"Unable to determine from repository analysis."
+
+Mechanical engines (`src/intel/`):
+- **Domain Discovery Engine** (`taxonomy.js` + `capabilities.js`) — matches a
+  curated catalog of ~40 capabilities (Authentication, Payroll, Attendance,
+  Resume Processing, Search, Payments, Notifications, AI Features, Caching,
+  Jobs, ...) against multi-signal evidence, weighting implementation over tests
+  so a feature that is only *referenced* in tests never reads as *implemented*.
+- **System Map + Why-Graph** (`systemmap.js`) — a graph whose nodes are systems
+  (not folders) and whose edges carry a business-level reason ("Payroll reads
+  Attendance because salary depends on worked hours"), derived from real
+  imports/calls/shared-table hand-offs.
+- **Product engine** (`product.js`) — Product Overview (what/who/why/features/
+  stack), Capability Map (capability → sub-capability → files/APIs/tables/tests/
+  docs), inferred User Journeys, per-system Stories (purpose/inputs/outputs/
+  dependencies/consumers/value/risks), and a Product Scorecard (architecture,
+  business/technical modularity, domain separation, AI readiness, onboarding,
+  ...) with recommendations.
+- **Intent engine** (`intent.js`) — translates natural-language questions ("how
+  are users authenticated?", "where is salary calculated?") into graph queries
+  and returns focused evidence; plus Conversational Maps ("show systems touching
+  Redis", "show database writes").
+- **Guided Tour** (`intel.js`) — an adaptive, ordered walkthrough of the systems
+  a newcomer should learn, with a complexity-based time estimate.
+
+AI narration (`src/ai/intel-generators.js`, all optional/grounded): product
+overview, system story, tour stop, journey, why-edge, intent answer, scorecard.
+
+New endpoints: `/api/intel` (+ `?section=`), `/api/intel/query` (intent + map
+modes), `/api/ai/intel`. New web module `web/assets/pages6.js` with pages:
+**System Map** (new default landing when intel is available), Product Overview,
+Capability Map, User Journeys, System Stories, Guided Tour, Ask the Repo, Product
+Scorecard, and Beginner Mode. All Phase 1-4 pages unchanged (37/37 render OK).
+
+Validated on real repos: HRMS → full-stack HR app (Payroll/Attendance/Leave/
+Employee, HR Operations Cycle journey, salary→Payroll intent); Flask → correctly
+reported as technical/library code with no invented product features.
