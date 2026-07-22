@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Repository Intelligence Platform</title>
+<link rel="stylesheet" href="assets/styles.css"/>
+</head>
+<body>
+
+<!-- Landing / analyze -->
+<div id="landing">
+  <div class="logo">Repo Intelligence</div>
+  <h1>Understand any codebase</h1>
+  <p class="sub">Paste a Git repository URL or a local path. The platform clones it, runs universal static analysis across 15+ languages, and builds an interactive, searchable map of the architecture &mdash; with an optional AI assistant grounded in the code.</p>
+  <div class="analyze-box">
+    <div class="analyze-row">
+      <input id="repo-input" type="text" placeholder="https://github.com/owner/repo  or  /path/to/local/repo" autocomplete="off" spellcheck="false"/>
+      <button class="btn" id="analyze-btn">Analyze</button>
+    </div>
+    <div class="examples" id="examples"></div>
+    <div id="progress"></div>
+  </div>
+  <div class="landing-feats">
+    <div class="feat"><div class="ic">&#128506;</div><div class="t">Universal analysis</div><div class="d">Tree-sitter parsing for TS, JS, Python, Go, Rust, Java, C#, PHP, Ruby, C/C++, Swift, Kotlin, Dart, Scala.</div></div>
+    <div class="feat"><div class="ic">&#128279;</div><div class="t">Knowledge graph</div><div class="d">Files, functions, classes, routes, tables, deps and their imports/calls/reads/writes.</div></div>
+    <div class="feat"><div class="ic">&#129504;</div><div class="t">Optional AI</div><div class="d">Bring any provider (OpenAI, Gemini, Claude, Ollama...). Grounded answers with citations.</div></div>
+    <div class="feat"><div class="ic">&#128269;</div><div class="t">Everything clickable</div><div class="d">Dashboard, explorers, graphs, flows, quality, security, search, version compare.</div></div>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app">
+  <aside id="sidebar">
+    <div id="brand"><div class="n" id="brand-name">&mdash;</div><div class="m" id="brand-meta"></div></div>
+    <nav id="nav"></nav>
+    <div class="foot"><button class="btn ghost sm" style="width:100%" id="new-repo-btn">Analyze another repo</button></div>
+  </aside>
+  <main id="main">
+    <div id="topbar">
+      <div id="crumbs"></div>
+      <div id="search-wrap">
+        <input id="search" type="text" placeholder="Search everything...  (press /)" autocomplete="off" spellcheck="false"/>
+        <div id="search-results"></div>
+      </div>
+    </div>
+    <div id="content"></div>
+  </main>
+</div>
+
+<script src="assets/graph.js"></script>
+<script src="assets/sgraph.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/pages.js"></script>
+<script src="assets/pages2.js"></script>
+<script src="assets/ai.js"></script>
+<script src="assets/pages3.js"></script>
+<script src="assets/pages4.js"></script>
+<script src="assets/pages5.js"></script>
+</body>
+</html>
