@@ -10,26 +10,43 @@
 import fs from 'fs';
 import path from 'path';
 import { analyzeJavaFile } from './java-analyzer.js';
+import { adapterFor, deepLanguages, capabilityReport } from './adapters.js';
 import { buildSymbolIndex } from './symbol-index.js';
 import { buildCrossLayer, discoverFeatureFlows, detectLooseEnds } from './engine.js';
 import { traceBackward, traceForward } from './lineage.js';
 
 export async function buildTraceModel(universalIndex, dir) {
-  // gather Java files from the universal index (paths are repo-relative)
-  const javaFilePaths = (universalIndex.files || []).filter((f) => f.lang === 'java').map((f) => f.path);
-  if (!javaFilePaths.length) {
-    return { available: false, reason: 'no Java files (deep tracing currently targets Java/Spring)', languages: (universalIndex.languages || []).map((l) => l.label) };
+  // gather files for every language that has a deep analyzer adapter
+  const deep = new Set(deepLanguages());
+  const targetFiles = (universalIndex.files || []).filter((f) => deep.has(f.lang));
+  const capabilities = capabilityReport(universalIndex.languages || []);
+  if (!targetFiles.length) {
+    return { available: false, reason: 'no deeply-analyzable files found (deep tracing supports Java, TypeScript, TSX, JavaScript)', languages: (universalIndex.languages || []).map((l) => l.label), capabilities };
   }
-  const javaFiles = [];
-  for (const rel of javaFilePaths) {
+  const langFiles = [];
+  const dbAccessAll = [];
+  const apiCallsAll = [];
+  const routesAll = [];
+  for (const f of targetFiles) {
+    const adapter = adapterFor(f.lang);
+    if (!adapter) continue;
     let src;
-    try { src = fs.readFileSync(path.join(dir, rel), 'utf8'); } catch { continue; }
-    const r = await analyzeJavaFile(rel, src);
-    if (r) javaFiles.push(r);
+    try { src = fs.readFileSync(path.join(dir, f.path), 'utf8'); } catch { continue; }
+    let r;
+    try { r = await adapter.analyze(f.path, src); } catch { r = null; }
+    if (!r) continue;
+    langFiles.push(r);
+    if (r.dbAccess) for (const d of r.dbAccess) dbAccessAll.push(d);
+    if (r.apiCalls) for (const a of r.apiCalls) apiCallsAll.push(a);
+    if (r.routes) for (const rt of r.routes) routesAll.push(rt);
   }
-  if (!javaFiles.length) return { available: false, reason: 'Java files failed to parse' };
+  if (!langFiles.length) return { available: false, reason: 'files failed to parse', capabilities };
 
-  const sindex = buildSymbolIndex(javaFiles);
+  const sindex = buildSymbolIndex(langFiles);
+  // attach cross-file DB/API/route evidence to the symbol index for the engine
+  sindex.dbAccess = dbAccessAll;
+  sindex.apiCalls = apiCallsAll;
+  sindex.tsRoutes = routesAll;
   const crossLayer = buildCrossLayer(sindex, universalIndex);
   const looseEnds = detectLooseEnds(sindex, crossLayer);
 
@@ -38,16 +55,20 @@ export async function buildTraceModel(universalIndex, dir) {
     _sindex: sindex,               // kept server-side for querying (not serialized to client)
     crossLayer,
     looseEnds: looseEnds.looseEnds,
+    capabilities,
+    languages: [...new Set(langFiles.map((f) => f.classes[0] && f.classes[0].framework).filter(Boolean))],
     stats: {
       classes: sindex.stats.classes, methods: sindex.stats.methods, fields: sindex.stats.fields,
-      routes: crossLayer.links.length, looseEnds: looseEnds.looseEnds.length,
+      routes: crossLayer.links.length + routesAll.length, looseEnds: looseEnds.looseEnds.length,
       controllers: sindex.classes.filter((c) => c.stereotype === 'controller').length,
       services: sindex.classes.filter((c) => c.stereotype === 'service').length,
       repositories: sindex.classes.filter((c) => c.stereotype === 'repository').length,
       entities: sindex.classes.filter((c) => c.stereotype === 'entity').length,
+      components: sindex.classes.filter((c) => c.stereotype === 'component').length,
+      dbAccess: dbAccessAll.length, apiCalls: apiCallsAll.length,
     },
     // clickable symbol catalog (trimmed) for the UI
-    symbols: sindex.symbols.filter((s) => ['class', 'interface', 'method', 'field', 'entity', 'record'].includes(s.kind) || s.containingClass)
+    symbols: sindex.symbols.filter((s) => ['class', 'interface', 'method', 'field', 'entity', 'record', 'module', 'type', 'enum'].includes(s.kind) || s.containingClass)
       .map((s) => ({ id: s.id, kind: s.kind, name: s.name, fqn: s.fqn, file: s.file, line: s.line, returnType: s.returnType, containingClass: s.containingClass })),
   };
 }

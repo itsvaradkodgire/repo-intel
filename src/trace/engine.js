@@ -107,10 +107,11 @@ export function discoverFeatureFlows(sindex, universalIndex, query) {
     // db columns / tables touched
     const bt = quickBackwardColumns(sindex, m);
     for (const col of bt) for (const t of terms) if (lc(col).includes(t)) { score += 2; signals.push('db:' + col); }
-    // reads an employee/entity, performs a calculation, persists -> business flow markers
+    // reads an entity, performs a calculation, persists -> business flow markers
     const hasCalc = m.locals.some((l) => l.init && l.init.op) || m.returns.some((r) => r.expr && r.expr.op);
-    const persists = (sindex.callGraph.get(m.id) || []).some((e) => /save|persist|insert/.test(lc(e.name)));
-    const isEntry = (m.annotations || []).some((a) => /Mapping$/.test(a.name)) || m.containingStereotype === 'controller';
+    const persists = methodPersists(sindex, m);
+    // entry point: Spring @*Mapping, controller stereotype, OR a Next/Express route handler
+    const isEntry = (m.annotations || []).some((a) => /Mapping$/.test(a.name)) || m.containingStereotype === 'controller' || isRouteHandler(sindex, m);
     if (score > 0) {
       if (hasCalc) { score += 1.5; signals.push('has-calculation'); }
       if (persists) { score += 1.5; signals.push('persists'); }
@@ -180,8 +181,9 @@ function buildFlowEvidence(sindex, members) {
     // persistence: recognize repository save/persist/insert calls by raw name
     // (JpaRepository.save is inherited and not in our symbol index, so check
     // the raw call sites too, not just resolved call-graph edges).
-    for (const c of (m.calls || [])) { if (/^(save|saveAll|persist|insert|create|update|upsert|store)$/i.test(c.name) && /repository|repo|dao|entityManager|em/i.test(String(c.receiver || ''))) ev.persists = true; }
-    for (const e of (sindex.callGraph.get(m.id) || [])) { if (/save|persist|insert/.test(lc(e.name))) ev.persists = true; }
+    // persistence: recognize repository save/persist/insert calls by raw name
+    // (Java JpaRepository.save inherited, or TS Supabase/Prisma writes).
+    if (methodPersists(sindex, m)) ev.persists = true;
     // preview marker: returns a response DTO but performs no persistence
     if (/preview/i.test(m.name) || /Preview/.test(m.containingClass)) ev.returnsPreview = true;
     for (const col of quickBackwardColumns(sindex, m)) { ev.columns.add(col); ev.tables.add(col.split('.')[0]); }
@@ -265,7 +267,7 @@ function callClosure(sindex, methodId, maxDepth) {
   return seen;
 }
 function quickBackwardColumns(sindex, m) {
-  // cheap: columns from getters on entities called anywhere in this method, plus this class's own columns
+  // columns from getters on entities (Java) + Supabase/Prisma table.column access (TS)
   const cols = new Set();
   const cls = sindex.typeByFqn.get(m.containingClass);
   for (const e of (sindex.callGraph.get(m.id) || [])) {
@@ -276,7 +278,28 @@ function quickBackwardColumns(sindex, m) {
       if (gm) { const fn = gm[1][0].toLowerCase() + gm[1].slice(1); const f = cc.fields.find((x) => x.name === fn); if (f && f.columnName && cc.tableName) cols.add(cc.tableName + '.' + f.columnName); }
     }
   }
+  // TS: this method's own Supabase/Prisma db access (table + selected/inserted columns)
+  for (const d of (sindex.dbAccess || [])) {
+    if (d.inMethod !== (m.containingClass + '.' + m.name)) continue;
+    if (d.table && d.columns && d.columns.length) for (const col of d.columns) cols.add(d.table + '.' + col);
+    else if (d.table) cols.add(d.table);
+  }
   return [...cols];
+}
+// TS/Java-aware persistence detection
+function methodPersists(sindex, m) {
+  for (const c of (m.calls || [])) {
+    if (/^(save|saveAll|persist|store)$/i.test(c.name) && /repository|repo|dao|entityManager|em/i.test(String(c.receiver || ''))) return true;
+    if (/^(insert|create|createMany|upsert)$/i.test(c.name)) return true; // supabase/prisma writes
+  }
+  for (const d of (sindex.dbAccess || [])) if (d.inMethod === (m.containingClass + '.' + m.name) && /insert|create|upsert|update|delete/i.test(d.op || '')) return true;
+  for (const e of (sindex.callGraph.get(m.id) || [])) { if (/save|persist|insert/.test(lc(e.name))) return true; }
+  return false;
+}
+// is this method a Next.js / Express route handler (an HTTP entry point)?
+function isRouteHandler(sindex, m) {
+  const routes = sindex.tsRoutes || [];
+  return routes.some((r) => r.handler === (m.containingClass + '.' + m.name) || (r.file === m.file && /^(GET|POST|PUT|PATCH|DELETE)$/.test(m.name)));
 }
 function usedLater(m, name, line) {
   for (const a of m.assignments) if (a.line > line && a.expr && (a.expr.refs || []).includes(name)) return true;

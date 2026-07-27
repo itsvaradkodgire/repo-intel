@@ -3,3 +3,4 @@ output/
 .repo-intel-cache/
 *.log
 .DS_Store
+.cache/

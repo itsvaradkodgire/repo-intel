@@ -46,6 +46,29 @@ function getterColumn(calleeClass, methodName, idx) {
   return null;
 }
 
+// camelCase -> snake_case (monthlySalary -> monthly_salary)
+function toSnake(s) { return String(s || '').replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase(); }
+
+// TS: resolve a member-access read (employee.monthlySalary) to a DB column by
+// matching the property's snake_case against columns actually SELECTed via
+// Supabase/Prisma anywhere in the repo. Evidence: the column literally appears
+// in a query's projection, and the accessed property name matches it.
+function dbColumnFor(idx, m, expr, token) {
+  if (!idx || !expr) return null;
+  if (expr.kind !== 'member_expression' && !/\./.test(expr.raw || '')) return null;
+  // property = last identifier after the final dot in the raw member access
+  const mm = /\.([a-zA-Z_$][\w$]*)\s*$/.exec(String(expr.raw || '').trim());
+  if (!mm) return null;
+  const prop = mm[1];
+  const snake = toSnake(prop);
+  const db = idx.dbAccess || [];
+  // prefer a select hit whose projection lists this column
+  let hit = db.find((d) => /select|find/i.test(d.op || '') && (d.columns || []).includes(snake));
+  if (!hit) hit = db.find((d) => (d.columns || []).includes(snake));
+  if (hit && hit.table) return { table: hit.table, column: snake };
+  return null;
+}
+
 /**
  * Backward trace of a variable value.
  * @returns { root, steps:[{from,to,type,file,line,confidence,detail}], formulas:[], origins:[] }
@@ -81,6 +104,9 @@ export function traceBackward(idx, methodId, varName, opts = {}) {
         if (d.expr) {
           // record a formula if it's arithmetic
           if (d.expr.op) formulas.push({ result: token, op: d.expr.op, operands: d.expr.operands, raw: d.expr.raw, type: d.type, file: m.file, line: d.line, method: m.id, condition: d.condition });
+          // TS: a value read from a Supabase/Prisma query -> DB column origin
+          const dbCol = dbColumnFor(idx, m, d.expr, token);
+          if (dbCol) { origins.push({ kind: 'column', table: dbCol.table, column: dbCol.column, entity: dbCol.table, file: m.file, line: d.line }); steps.push({ from: token, to: dbCol.table + '.' + dbCol.column, type: 'LOADED_FROM', file: m.file, line: d.line, confidence: CONF.VERIFIED, detail: 'read from ' + dbCol.table + ' via query' }); }
           // the expression's inputs
           const inputs = exprInputs(d.expr);
           for (const inp of inputs) {
