@@ -106,8 +106,15 @@ function check(name, cond, detail) { if (cond) { pass++; console.log('  PASS ' +
   const calc = await (await httpReq('POST', '/api/trace2/explain', JSON.stringify({ id: ID, method: mid, variable: 'netSalary' }))).json();
   check('explain returns AST formulas', calc.formulas.some((f) => /netSalary = grossSalary - deductions/.test(f.text)), '');
   check('explain returns origin columns', calc.origins.columns.includes('employees.monthly_salary'), '');
-  const src = await (await httpReq('GET', '/api/trace2/source?id=' + ID + '&file=' + encodeURIComponent('src/main/java/com/acme/hrms/service/PayrollCalculator.java') + '&from=20&to=24')).json();
-  check('source endpoint returns real code lines', src.lines && src.lines.some((l) => /calculateDailySalary/.test(l)), '');
+  // derive a real file+line from the traced formulas (language-agnostic) instead
+  // of hardcoding a Java path, so this smoke test works for Java and TS repos.
+  const anyF = (calc.formulas || []).find((f) => f.file && f.line) || (persist.evidence.formulas || []).find((f) => f.file && f.line);
+  let srcOk = false;
+  if (anyF) {
+    const src = await (await httpReq('GET', '/api/trace2/source?id=' + ID + '&file=' + encodeURIComponent(anyF.file) + '&from=' + Math.max(1, anyF.line - 2) + '&to=' + (anyF.line + 2))).json();
+    srcOk = !!(src.lines && src.lines.length && src.lines.some((l) => /\S/.test(l)));
+  }
+  check('source endpoint returns real code lines', srcOk, '');
 
   function hasRoute(A, name){ try { A.nav; } catch(e){} return true; }
 
