@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node trace-accept.mjs && node trace-accept-ts.mjs && node github-selftest.mjs",
+    "test": "node trace-accept.mjs && node trace-accept-ts.mjs && node github-selftest.mjs && node oauth-selftest.mjs",
     "start": "node src/server/server.js",
     "analyze": "node bin/analyze.js",
     "serve": "node src/server/server.js"

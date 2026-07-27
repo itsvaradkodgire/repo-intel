@@ -373,3 +373,38 @@ h1.pt{font-size:21px;letter-spacing:-.01em}
 .cap-struct{background:var(--panel2);color:var(--dim);border-color:var(--border)}
 .cap-files{font-size:11.5px;color:var(--faint);font-family:var(--mono)}
 .cap-legend{margin-top:9px;color:var(--faint2);font-size:11px}
+
+/* ---- GitHub sign-in + repo picker ---- */
+.gh-auth{margin-top:12px;display:flex;justify-content:center}
+.gh-signin{display:inline-flex;align-items:center;gap:8px;background:#24292f;border-color:#24292f;color:#fff}
+.gh-signin:hover{background:#1b1f24;border-color:#1b1f24}
+.gh-note{margin-top:10px;color:var(--faint2);text-align:center;max-width:520px}
+.gh-userbox{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center}
+.gh-user{display:inline-flex;align-items:center;gap:8px}
+.gh-av{width:22px;height:22px;border-radius:50%;border:1px solid var(--border)}
+.gh-login{font-size:13px;color:var(--text);font-family:var(--mono)}
+.gh-auth-top{display:flex;align-items:center;gap:8px;margin-left:10px}
+.gh-auth-top .gh-login{display:none}
+.gh-auth-top .btn.ghost{padding:4px 8px}
+#topbar{display:flex;align-items:center}
+
+#ghpick-overlay{position:fixed;inset:0;background:rgba(4,8,16,.66);backdrop-filter:blur(3px);z-index:120;display:none;align-items:flex-start;justify-content:center;padding:8vh 16px}
+#ghpick-overlay.on{display:flex}
+#ghpick{width:100%;max-width:680px;max-height:76vh;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.5)}
+#ghpick-head{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border)}
+#ghpick-title{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap}
+#ghpick-search{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 12px;font-size:13px;outline:none}
+#ghpick-search:focus{border-color:var(--accent)}
+#ghpick-x{cursor:pointer;font-size:22px;line-height:1;color:var(--faint);padding:0 4px}
+#ghpick-x:hover{color:var(--text)}
+#ghpick-list{overflow-y:auto;padding:6px}
+.ghrepo{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:9px;cursor:pointer;border:1px solid transparent}
+.ghrepo:hover{background:var(--panel2);border-color:var(--border)}
+.ghname{font-size:13.5px;color:var(--text);font-family:var(--mono);display:flex;align-items:center;gap:8px}
+.ghdesc{font-size:12px;color:var(--faint);margin-top:3px;max-width:440px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ghmeta{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.ghlang{font-size:11.5px;color:var(--dim)}
+.ghstar{font-size:11.5px;color:var(--amber)}
+.ghtag{font-size:10.5px;padding:1px 7px;border-radius:20px;font-family:var(--mono)}
+.ghtag.priv{background:rgba(245,177,61,.14);color:var(--amber);border:1px solid rgba(245,177,61,.3)}
+.ghtag.pub{background:var(--panel2);color:var(--dim);border:1px solid var(--border)}

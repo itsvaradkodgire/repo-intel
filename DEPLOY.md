@@ -40,6 +40,19 @@ If you created the service manually instead of via blueprint, set:
 - **Health Check Path:** `/healthz`
 - Environment: `NODE_VERSION=22.11.0`, `REPO_INTEL_CACHE=/tmp/repo-intel-cache`
 
+### "Sign in with GitHub" (optional)
+
+To enable the login button + "browse my repositories" picker, create an OAuth
+App at <https://github.com/settings/developers> with callback URL
+`https://YOUR-HOST/api/auth/github/callback`, then set on the server:
+
+- `GITHUB_OAUTH_CLIENT_ID`
+- `GITHUB_OAUTH_CLIENT_SECRET`
+
+Leave unset to run without login (public repos only). See `.env.example` and
+`src/github/README.md`. The user's token stays server-side; the browser only
+gets an httpOnly session cookie.
+
 ## Option B — Docker (Render Docker / Fly.io / Railway / Cloud Run)
 
 A `Dockerfile` is included (Node 22 + `git`, health check, binds `0.0.0.0`).

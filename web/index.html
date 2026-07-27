@@ -18,6 +18,7 @@
       <input id="repo-input" type="text" placeholder="https://github.com/owner/repo  or  /path/to/local/repo" autocomplete="off" spellcheck="false"/>
       <button class="btn" id="analyze-btn">Analyze</button>
     </div>
+    <div id="gh-auth" class="gh-auth"></div>
     <div class="examples" id="examples"></div>
     <div id="progress"></div>
   </div>
@@ -57,6 +58,18 @@
   </div>
 </div>
 
+<!-- GitHub repo picker -->
+<div id="ghpick-overlay" role="dialog" aria-modal="true" aria-label="Your GitHub repositories">
+  <div id="ghpick">
+    <div id="ghpick-head">
+      <div id="ghpick-title">Your repositories</div>
+      <input id="ghpick-search" type="text" placeholder="Filter repositories..." autocomplete="off" spellcheck="false"/>
+      <div id="ghpick-x" role="button" aria-label="Close" tabindex="0">&times;</div>
+    </div>
+    <div id="ghpick-list"></div>
+  </div>
+</div>
+
 <script src="assets/graph-layout.js"></script>
 <script src="assets/graph.js"></script>
 <script src="assets/sgraph.js"></script>
@@ -70,5 +83,6 @@
 <script src="assets/pages6.js"></script>
 <script src="assets/pages7.js"></script>
 <script src="assets/pages8.js"></script>
+<script src="assets/pages9.js"></script>
 </body>
 </html>

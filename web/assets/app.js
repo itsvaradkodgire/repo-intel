@@ -69,6 +69,7 @@ function loadIndex(id){
     var bi=document.querySelector('#brand .badge-ic');if(bi)bi.textContent=(repoName[0]||'R').toUpperCase();
     document.getElementById('brand-meta').textContent=D.languages.slice(0,3).map(function(l){return l.label;}).join(' · ')+' · '+num(D.manifest.counts.loc)+' LOC';
     buildNav();setupSearch();
+    if(window.RIGH_REFRESH)try{window.RIGH_REFRESH();}catch(e){}
     if(!location.hash||location.hash==='#')location.hash=(D.trace&&D.trace.available)?'#/investigate':'#/home';
     render();
   });
@@ -234,6 +235,7 @@ A={h:h,el:el,esc:esc,num:num,baseName:baseName,route:route,nav:window.RINAV,rend
    get D(){return D;},get IDX(){return IDX;},langColor:langColor,layerColor:layerColor};
 window.RIAPP=A;
 window.RIRENDER=render;
+window.RISTARTANALYZE=startAnalyze; // used by the GitHub repo picker (pages9.js)
 
 // ---- boot ----
 document.addEventListener('DOMContentLoaded',function(){

@@ -1,9 +1,70 @@
-# GitHub Integration (private-repo analysis via a GitHub App)
+# GitHub Integration (private-repo analysis)
 
-This module lets the platform analyze **private** GitHub repositories without
-ever pasting a Personal Access Token, storing long-lived credentials, or sending
-repo source to the browser. It uses a **GitHub App** with read-only, least-
-privilege access.
+There are **two independent ways** to analyze private repositories. Pick either.
+
+| | **Sign in with GitHub** (OAuth) | **GitHub App** (installation) |
+|---|---|---|
+| Best for | a user analyzing **their own** repos | **org-wide**, least-privilege automation |
+| UX | click "Sign in with GitHub", pick a repo | owner installs an app on selected repos |
+| Acts as | the signed-in **user** | the **installation** |
+| Files | `oauth.js`, `sessions.js`, `auth-routes.js` | `app-auth.js`, `token-manager.js`, `source.js` |
+| Config | `GITHUB_OAUTH_CLIENT_ID/SECRET` | `GITHUB_APP_ID` / `GITHUB_APP_PRIVATE_KEY` |
+
+Both keep the credential **server-side only**; the browser never sees a token.
+
+---
+
+## A. Sign in with GitHub (OAuth login + repo picker)
+
+The landing page shows a **Sign in with GitHub** button. After signing in, the
+user gets a **My repositories** picker and can analyze any of their repos
+(public or private) in one click.
+
+Flow (`oauth.js` + `sessions.js` + `auth-routes.js`):
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant S as Server
+    participant GH as GitHub
+    B->>S: GET /api/auth/github/login
+    S->>B: 302 to GitHub authorize (state in httpOnly pre-session cookie)
+    B->>GH: authorize + approve
+    GH->>S: GET /api/auth/github/callback?code&state
+    S->>S: verify state (CSRF, one-time), exchange code -> user token
+    S->>GH: GET /user (token)
+    S->>B: 302 home + httpOnly session cookie (opaque id only)
+    B->>S: GET /api/github/repos (cookie)
+    S->>GH: GET /user/repos (token, server-side)
+    S->>B: repo list (no token)
+    B->>S: analyze chosen repo -> server clones with the session token
+```
+
+**Setup:** create an OAuth App at
+<https://github.com/settings/developers> -> **New OAuth App**:
+- **Authorization callback URL:** `https://YOUR-HOST/api/auth/github/callback`
+  (local dev: `http://localhost:4477/api/auth/github/callback`)
+- Set `GITHUB_OAUTH_CLIENT_ID` and `GITHUB_OAUTH_CLIENT_SECRET` on the server.
+- Default scope is `repo read:user`. Use `public_repo read:user` to restrict to
+  public repos only (`GITHUB_OAUTH_SCOPE`).
+
+**Security:**
+- CSRF-protected via a random `state` bound to a one-time httpOnly pre-session
+  cookie (`consumeOAuth` rejects replays and mismatches).
+- The user token + profile live in a server-side session; the browser holds only
+  an opaque, httpOnly `ri_sess` id (SameSite=Lax, Secure on HTTPS).
+- `/api/auth/me` returns only the public profile, never the token.
+- Sessions are in memory (single instance). For multi-instance, back
+  `sessions.js` with Redis behind the same interface.
+- Validated offline by `oauth-selftest.mjs` (**22/22**): authorize URL, CSRF
+  one-time-use, cookie flags, and "token never in the public shape".
+
+---
+
+## B. GitHub App (organization installations)
+
+Analyze private repos without pasting a Personal Access Token, using a read-only
+GitHub App with least-privilege access.
 
 ## Why a GitHub App (not a PAT)
 

@@ -21,6 +21,7 @@ import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { ingest, gitRefs } from '../analyzer/ingest.js';
 import { resolveSource } from '../github/source.js';
+import { handleLogin, handleCallback, handleMe, handleLogout, handleRepos, tokenForSession } from '../github/auth-routes.js';
 import { analyzeRepo } from '../analyzer/analyze.js';
 import { compareIndexes } from '../analyzer/compare.js';
 import { listModels, chat, PROVIDER_PRESETS, resolveConfig } from '../ai/providers.js';
@@ -82,15 +83,28 @@ async function handleAnalyze(req, res) {
   const id = idFor(input, ref);
   try {
     sseSend(res, 'progress', { message: 'Resolving repository...' });
-    // GitHub source resolution: public repos clone as-is; private repos get a
-    // short-lived, least-privilege installation token (never stored/logged).
+    // Repo resolution + private access. Order of preference:
+    //   1. If the user is signed in via GitHub OAuth, use THEIR token (lets them
+    //      analyze their own private repos with no App install).
+    //   2. Else, for a private GitHub repo, mint a GitHub App installation token.
+    //   3. Else clone anonymously (public).
+    // In all cases the token is used server-side only and never sent to the client.
     let authToken, visibility;
+    const sess = tokenForSession(req);
     try {
       const resolved = await resolveSource(input);
-      authToken = resolved.authToken; visibility = resolved.visibility;
-      if (visibility === 'private') sseSend(res, 'progress', { message: 'Private repository: using GitHub App installation token (server-side, ephemeral).' });
+      visibility = resolved.visibility;
+      authToken = resolved.authToken;
+      if (visibility === 'private') {
+        if (sess) { authToken = sess.token; sseSend(res, 'progress', { message: `Private repository: using ${sess.user.login}'s GitHub session (server-side).` }); }
+        else if (authToken) sseSend(res, 'progress', { message: 'Private repository: using GitHub App installation token (server-side, ephemeral).' });
+      }
     } catch (e) {
-      if (e.code === 'GITHUB_APP_NOT_CONFIGURED') { sseSend(res, 'error', { message: e.message }); return res.end(); }
+      // If the App isn't configured but the user IS signed in, use their token.
+      if (e.code === 'GITHUB_APP_NOT_CONFIGURED') {
+        if (sess) { authToken = sess.token; visibility = 'private'; sseSend(res, 'progress', { message: `Private repository: using ${sess.user.login}'s GitHub session (server-side).` }); }
+        else { sseSend(res, 'error', { message: e.message + ' (Or sign in with GitHub to analyze your own private repos.)' }); return res.end(); }
+      }
       // any other resolution issue: fall back to anonymous clone (public path)
     }
     const ing = await ingest(input, { ref, authToken, onLog: (m) => sseSend(res, 'progress', { message: m }) });
@@ -547,6 +561,12 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && (p === '/healthz' || p === '/api/health')) {
       return send(res, 200, { ok: true, service: 'repo-intel', uptime: process.uptime() });
     }
+    // ---- GitHub sign-in (OAuth) + repo browsing ----
+    if (req.method === 'GET' && p === '/api/auth/github/login') return handleLogin(req, res, url);
+    if (req.method === 'GET' && p === '/api/auth/github/callback') return await handleCallback(req, res, url);
+    if (req.method === 'GET' && p === '/api/auth/me') return handleMe(req, res);
+    if (req.method === 'POST' && p === '/api/auth/logout') return handleLogout(req, res);
+    if (req.method === 'GET' && p === '/api/github/repos') return await handleRepos(req, res);
     if (req.method === 'POST' && p === '/api/analyze') return await handleAnalyze(req, res);
     if (req.method === 'GET' && p.startsWith('/api/index/')) {
       const index = getCached(p.split('/').pop());
