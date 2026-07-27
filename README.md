@@ -387,3 +387,59 @@ new pipeline vs the old force layout on 22 real graphs from analyzed repos:
 **22% fewer edge crossings on readable graphs, 100% of node overlaps eliminated
 (192 → 0), 9 graphs improved / 13 tied / 0 worse, and fully deterministic**
 (identical input → identical layout). All 32 pages still render.
+
+## Trace Engine — Verified Feature & Data Tracing (core reorientation)
+
+The product's core is **code investigation**: a developer points at any feature or
+value and asks "how is this calculated?", "where does this come from?", "what
+happens to it?", and the system answers with **verified code evidence**, not AI
+guesses. Static analysis produces the evidence; AI only explains it.
+
+Reference language: **Java / Spring** (deepest analysis). Other languages keep
+their existing support and degrade gracefully (`trace.available = false`).
+
+Pipeline (`src/trace/`, all additive):
+- **java-analyzer.js** — structural tree-sitter walk extracting, with file:line:
+  classes/interfaces/enums/records, Spring stereotypes (`@RestController`,
+  `@Service`, `@Repository`, `@Component`, `@Entity`), JPA `@Table`/`@Column`
+  mappings, fields+types, methods (typed params/return/annotations), and method
+  bodies (locals, assignments, calls-with-receivers, returns, and the control-flow
+  condition each sits under).
+- **symbol-index.js** — cross-file symbol index with stable IDs + FQNs, per-method
+  variable typing, and a **type-aware call graph**: receiver variable → its
+  declared type → method on that class; interface receiver → implementations
+  (Spring DI). Every edge records how it resolved + confidence + line.
+- **lineage.js** — the core **data-flow** engine. `traceBackward` resolves a value
+  through assignments, parameters (→ caller arguments), method returns (→ callee
+  return expressions), fields, and getters → **DB columns**. `traceForward`
+  follows transforms, arg→param, returns, and entity/DTO setters → **persisted
+  columns** + **response DTO fields**. Each hop is a typed evidence edge tagged
+  VERIFIED / INFERRED / POSSIBLE.
+- **Calculation extraction** — real formulas pulled from the AST (incl. BigDecimal
+  method chains): `netSalary = grossSalary - deductions`, `dailySalary =
+  monthlySalary / WORKING_DAYS`, etc. The AI never invents formulas.
+- **engine.js** — multi-signal **feature discovery** (candidate flows with evidence
+  + confidence, never silently merged), cross-layer **route ↔ controller ↔ DTO**
+  binding, and **loose-end detection** (calculated-but-unused, created-not-
+  persisted, persisted-not-exposed, frontend-no-backend).
+
+Server: `/api/trace2` (summary + cross-layer + loose-ends), `/investigate`,
+`/explain`, `/variable`, `/method`, `/source` (real code ranges for evidence), and
+`/api/ai/trace` (grounded, evidence-only narration).
+
+UI (`web/assets/pages8.js`): **Investigate** is the new flagship — a question box,
+suggested investigation types, and ranked candidate flows; each flow opens a
+detail view with tabs (Overview / Flow / Calculations / Variables / API / Database
+/ Code / Issues), Explain-Calculation, backward/forward variable tracing, and a
+clickable **code-evidence popover** that opens the real source. Investigation is
+the default landing for Java repos; every prior page still works.
+
+Validation (reference repo `spring-hrms`, an HRMS payroll app built for this):
+- `docs/TRACE_ENGINE_AUDIT.md` — the required pre-implementation audit.
+- `trace-accept.mjs` — the 5 acceptance tests: **18/18 checks pass**. "How is
+  payroll calculated?" returns 3 real candidate flows (persisting run, preview,
+  and a non-"payroll"-named CompensationProcessor pipeline) with formulas, DB
+  columns, and conditions; value origin reaches `employees.monthly_salary`;
+  forward tracing reaches persisted columns + response DTO; the two
+  `PayrollService` implementations are kept separate; loose-ends are found.
+- `ui-smoke.cjs` — headless DOM smoke of the Investigation UI: **8/8 pass**.
