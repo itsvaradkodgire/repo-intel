@@ -359,3 +359,17 @@ h1.pt{font-size:21px;letter-spacing:-.01em}
 .src-line.hot{background:#14243f}
 .src-line .src-ln{color:var(--faint2);width:36px;text-align:right;flex-shrink:0;user-select:none}
 .src-line code{color:var(--text)}
+
+/* ---- Investigation capability table (per-language coverage) ---- */
+.cap-table{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin:12px 0}
+.cap-head{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--faint);margin-bottom:10px;font-family:var(--mono)}
+.cap-row{display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--border-soft)}
+.cap-row:last-of-type{border-bottom:none}
+.cap-lang{min-width:110px;font-size:13.5px;color:var(--text);font-family:var(--mono)}
+.cap-badge{font-size:11px;padding:2px 9px;border-radius:20px;font-family:var(--mono);border:1px solid transparent}
+.cap-full{background:rgba(61,214,154,.14);color:var(--green);border-color:rgba(61,214,154,.35)}
+.cap-deep{background:rgba(91,157,255,.14);color:var(--accent);border-color:rgba(91,157,255,.35)}
+.cap-sym{background:rgba(245,177,61,.13);color:var(--amber);border-color:rgba(245,177,61,.32)}
+.cap-struct{background:var(--panel2);color:var(--dim);border-color:var(--border)}
+.cap-files{font-size:11.5px;color:var(--faint);font-family:var(--mono)}
+.cap-legend{margin-top:9px;color:var(--faint2);font-size:11px}

@@ -52,13 +52,29 @@ function openSource(file,line){
 }
 
 // ================= INVESTIGATE (landing + results) =================
+
+// Capability table: per-language investigation depth, derived from analyzer
+// support (never hardcoded). Levels: fullstack > deep > symbol > structural.
+function capabilityTable(caps){
+  if(!caps||!caps.length) return el('<span></span>');
+  var LV={fullstack:{r:4,l:'Full stack',c:'cap-full'},deep:{r:3,l:'Deep',c:'cap-deep'},symbol:{r:2,l:'Symbols',c:'cap-sym'},structural:{r:1,l:'Structural',c:'cap-struct'}};
+  var rows=caps.slice().sort(function(a,b){return (LV[b.level]?LV[b.level].r:0)-(LV[a.level]?LV[a.level].r:0);}).map(function(c){
+    var lv=LV[c.level]||{l:c.level,c:'cap-struct'};
+    var files=c.files!=null?('<span class="cap-files">'+c.files+' file'+(c.files===1?'':'s')+'</span>'):'';
+    return '<div class="cap-row"><span class="cap-lang">'+esc(c.language)+'</span><span class="cap-badge '+lv.c+'">'+esc(lv.l)+'</span>'+files+'</div>';
+  }).join('');
+  var wrap=el('<div class="cap-table"><div class="cap-head">Investigation coverage by language</div>'+rows+'<div class="cap-legend mini">Full stack = symbols + call graph + data flow + investigation. Structural = navigation only.</div></div>');
+  return wrap;
+}
+
 route('investigate',function(content,arg){
   var v=view([]);
   v.appendChild(el('<h1 class="pt" style="font-size:24px">Investigate the code</h1>'));
   v.appendChild(el('<div class="pd">Ask how a feature works, where a value comes from, or what a calculation does. Answers are built from verified code evidence, not guesses.</div>'));
 
   if(!traceAvail()){
-    v.appendChild(el('<div class="callout warn">Deep code tracing currently targets <b>Java / Spring</b>. This repository is '+esc((D().languages||[]).slice(0,3).map(function(l){return l.label;}).join(', '))+'. Analyze a Java/Spring repository to use full investigation. (All other views still work.)</div>'));
+    v.appendChild(capabilityTable(D().trace&&D().trace.capabilities));
+    v.appendChild(el('<div class="callout warn">No deeply-analyzable source found in this repository. Deep investigation (data-flow, calculations, cross-layer tracing) supports <b>Java</b>, <b>TypeScript</b>, <b>TSX</b>, and <b>JavaScript</b>. Structural navigation still works for every language.</div>'));
     content.innerHTML='';content.appendChild(v);return;
   }
 
@@ -78,7 +94,8 @@ route('investigate',function(content,arg){
   var out=h('div');v.appendChild(out);
   // trace model at-a-glance
   var t=D().trace;
-  out.appendChild(el('<div class="mini" style="margin:10px 0">Indexed: '+t.stats.classes+' classes \u00b7 '+t.stats.methods+' methods \u00b7 '+t.stats.controllers+' controllers \u00b7 '+t.stats.services+' services \u00b7 '+t.stats.repositories+' repositories \u00b7 '+t.stats.entities+' entities'+(t.looseEnds&&t.looseEnds.length?' \u00b7 <span class="sev-medium">'+t.looseEnds.length+' loose ends</span>':'')+'</div>'));
+  v.insertBefore(capabilityTable(t.capabilities),out);
+  out.appendChild(el('<div class="mini" style="margin:10px 0">Indexed: '+t.stats.classes+' classes \u00b7 '+t.stats.methods+' methods \u00b7 '+t.stats.controllers+' controllers \u00b7 '+t.stats.services+' services \u00b7 '+t.stats.repositories+' repositories \u00b7 '+t.stats.entities+' entities'+(t.stats.components?' \u00b7 '+t.stats.components+' components':'')+(t.looseEnds&&t.looseEnds.length?' \u00b7 <span class="sev-medium">'+t.looseEnds.length+' loose ends</span>':'')+'</div>'));
 
   function run(){
     if(!q.value.trim())return;

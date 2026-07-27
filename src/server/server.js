@@ -31,6 +31,7 @@ import { initBrain, loadBrain, brainSummary, brainSearch, brainSimilar, getInsig
 import { answerIntent, conversationalMap } from '../intel/intent.js';
 import { productOverviewMessages, systemStoryMessages, tourStopMessages, journeyMessages, whyEdgeMessages, intentNarrativeMessages, scorecardMessages } from '../ai/intel-generators.js';
 import { buildTraceModel, investigateFeature, explainCalculation, traceVariable, getMethodDetail } from '../trace/index.js';
+import { capabilityReport } from '../trace/adapters.js';
 import { traceExplainMessages } from '../ai/trace-generators.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -329,7 +330,11 @@ async function handleTraceSummary(req, res) {
   let summary = index.trace;
   if (!summary || summary.available === undefined) {
     const m = await getTraceModel(id);
-    summary = m ? { available: m.available, stats: m.stats, crossLayer: m.crossLayer, looseEnds: m.looseEnds, symbols: m.symbols } : { available: false };
+    summary = m ? { available: m.available, stats: m.stats, crossLayer: m.crossLayer, looseEnds: m.looseEnds, symbols: m.symbols, capabilities: m.capabilities } : { available: false };
+  }
+  // ensure the capability report is always present for the UI (derive if missing)
+  if (summary && summary.capabilities === undefined) {
+    try { summary = { ...summary, capabilities: capabilityReport(index.languages || []) }; } catch { /* non-fatal */ }
   }
   return send(res, 200, summary);
 }
