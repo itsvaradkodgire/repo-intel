@@ -86,13 +86,16 @@ function describeExpr(node, src) {
     // chained arithmetic via BigDecimal: a.divide(b) / a.multiply(b) / a.subtract(b) / a.add(b)
     const nm = field(node, 'name'); const obj = field(node, 'object'); const args = field(node, 'arguments');
     const method = nm ? txt(nm, src) : '';
-    const ARITH = { divide: '/', multiply: '×', subtract: '-', add: '+' };
-    if (ARITH[method] && obj) {
+    const ARITH = { divide: '/', multiply: '×', subtract: '-', add: '+', mod: '%' };
+    // only treat as arithmetic when the object is itself a value (not the BigDecimal class)
+    if (ARITH[method] && obj && txt(obj, src) !== 'BigDecimal') {
       info.op = ARITH[method];
       const argList = args ? namedChildren(args) : [];
       info.operands = [describeOperand(obj, src), argList.length ? describeOperand(argList[0], src) : null];
     }
   }
+  // guard: operands must be clean strings
+  info.operands = info.operands.map((o) => (o == null ? null : String(o).replace(/\s+/g, ' ').trim()));
   return info;
 }
 function describeOperand(node, src) {
