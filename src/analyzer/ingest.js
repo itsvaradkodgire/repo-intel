@@ -42,7 +42,12 @@ async function run(cmd, args, cwd, timeoutMs = 180000) {
 
 /**
  * Resolve an input (git URL or local path) into a working directory.
- * options: { ref, depth, onLog }
+ * options: { ref, depth, onLog, authToken }
+ *
+ * authToken (optional): a short-lived credential for cloning a PRIVATE repo.
+ * It is used ONLY as an in-memory HTTP Basic credential for a single clone and
+ * is NEVER written to disk, logged, or stored in the remote URL. For GitHub App
+ * installation tokens this is an x-access-token. See src/github/README.md.
  */
 export async function ingest(input, options = {}) {
   const log = options.onLog || (() => {});
@@ -60,19 +65,28 @@ export async function ingest(input, options = {}) {
   const dir = repoDirFor(norm.url);
   const depth = options.depth ?? (options.ref ? 0 : 1);
 
+  // For private repos we inject the token via an ephemeral HTTP header
+  // (http.extraHeader) rather than embedding it in the remote URL, so the
+  // credential never lands in .git/config, reflogs, or process listings.
+  const auth = options.authToken
+    ? authArgs(norm.url, options.authToken)
+    : { pre: [], remote: norm.url, redactedRemote: norm.url };
+
   if (fs.existsSync(path.join(dir, '.git'))) {
-    log(`Updating cached clone: ${norm.url}`);
+    log(`Updating cached clone: ${auth.redactedRemote}`);
     try {
-      await run('git', ['fetch', '--all', '--tags', '--prune'], dir);
-    } catch (e) { log('fetch failed (using cached state): ' + e.message.split('\n')[0]); }
+      await run('git', [...auth.pre, 'fetch', '--all', '--tags', '--prune'], dir);
+    } catch (e) { log('fetch failed (using cached state): ' + redact(e.message.split('\n')[0], options.authToken)); }
   } else {
-    log(`Cloning ${norm.url} ...`);
+    log(`Cloning ${auth.redactedRemote} ...`);
     fs.rmSync(dir, { recursive: true, force: true });
-    const args = ['clone'];
+    const args = [...auth.pre, 'clone'];
     if (depth > 0) args.push('--depth', String(depth));
     if (!options.ref) args.push('--single-branch');
     args.push(norm.url, dir);
-    await run('git', args, CACHE_ROOT);
+    try {
+      await run('git', args, CACHE_ROOT);
+    } catch (e) { throw new Error(redact(e.message.split('\n')[0], options.authToken)); }
   }
 
   if (options.ref) {
@@ -82,15 +96,31 @@ export async function ingest(input, options = {}) {
     } catch {
       // try fetching that specific ref
       try {
-        await run('git', ['fetch', 'origin', options.ref], dir);
+        await run('git', [...auth.pre, 'fetch', 'origin', options.ref], dir);
         await run('git', ['checkout', options.ref], dir);
-      } catch (e) { throw new Error(`Could not checkout ref '${options.ref}': ${e.message.split('\n')[0]}`); }
+      } catch (e) { throw new Error(`Could not checkout ref '${options.ref}': ${redact(e.message.split('\n')[0], options.authToken)}`); }
     }
   }
+
+  // scrub any credential helper state just in case (defense in depth)
+  if (options.authToken) { try { await run('git', ['config', '--unset-all', 'http.extraHeader'], dir, 5000); } catch { /* noop */ } }
 
   const meta = await gitMeta(dir);
   return { dir, source: 'git', input: norm.url, meta, cloned: true };
 }
+
+// Build the ephemeral auth args for a private clone/fetch. GitHub App
+// installation tokens authenticate as Basic x-access-token:<token>. We pass the
+// header via -c http.extraHeader so it is only present for this invocation.
+function authArgs(url, token) {
+  const basic = Buffer.from('x-access-token:' + token).toString('base64');
+  return {
+    pre: ['-c', 'http.extraHeader=Authorization: Basic ' + basic],
+    remote: url,
+    redactedRemote: url, // url itself carries no secret
+  };
+}
+function redact(msg, token) { return token ? String(msg || '').split(token).join('***') : msg; }
 
 export async function gitMeta(dir) {
   const safe = async (args) => {

@@ -20,6 +20,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { ingest, gitRefs } from '../analyzer/ingest.js';
+import { resolveSource } from '../github/source.js';
 import { analyzeRepo } from '../analyzer/analyze.js';
 import { compareIndexes } from '../analyzer/compare.js';
 import { listModels, chat, PROVIDER_PRESETS, resolveConfig } from '../ai/providers.js';
@@ -81,9 +82,20 @@ async function handleAnalyze(req, res) {
   const id = idFor(input, ref);
   try {
     sseSend(res, 'progress', { message: 'Resolving repository...' });
-    const ing = await ingest(input, { ref, onLog: (m) => sseSend(res, 'progress', { message: m }) });
+    // GitHub source resolution: public repos clone as-is; private repos get a
+    // short-lived, least-privilege installation token (never stored/logged).
+    let authToken, visibility;
+    try {
+      const resolved = await resolveSource(input);
+      authToken = resolved.authToken; visibility = resolved.visibility;
+      if (visibility === 'private') sseSend(res, 'progress', { message: 'Private repository: using GitHub App installation token (server-side, ephemeral).' });
+    } catch (e) {
+      if (e.code === 'GITHUB_APP_NOT_CONFIGURED') { sseSend(res, 'error', { message: e.message }); return res.end(); }
+      // any other resolution issue: fall back to anonymous clone (public path)
+    }
+    const ing = await ingest(input, { ref, authToken, onLog: (m) => sseSend(res, 'progress', { message: m }) });
     const index = await analyzeRepo(ing.dir, { onLog: (m) => sseSend(res, 'progress', { message: m }) });
-    index.source = { input: ing.input, source: ing.source, git: ing.meta, id, brainDir: ing.dir };
+    index.source = { input: ing.input, source: ing.source, git: ing.meta, id, brainDir: ing.dir, visibility: visibility || 'public' };
     CACHE.set(id, { index, dir: ing.dir, input });
     // persist to disk cache for reload
     try {
