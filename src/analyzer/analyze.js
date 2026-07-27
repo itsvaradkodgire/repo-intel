@@ -22,6 +22,7 @@ import { inferFlows } from './flows.js';
 import { buildSemantic } from './semantic.js';
 import { buildSemanticGraph } from './semantic-graph.js';
 import { buildIntel } from '../intel/intel.js';
+import { buildTraceModel } from '../trace/index.js';
 
 export async function analyzeRepo(dir, opts = {}) {
   const log = opts.onLog || (() => {});
@@ -182,6 +183,23 @@ export async function analyzeRepo(dir, opts = {}) {
   } catch (e) {
     log('  intel layer failed (non-fatal): ' + e.message);
     result.intel = null;
+  }
+
+  // ---- Trace Engine (additive): verified feature & data tracing (Java/Spring) ----
+  // Deep symbol/variable/expression analysis for code investigation. The full
+  // model (with method bodies) is heavy, so only a serializable summary is stored
+  // on the index; the server rebuilds the queryable model on demand from the dir.
+  log('Building trace engine model (deep Java/Spring analysis)...');
+  try {
+    result.trace = await buildTraceModel(result, dir);
+    if (result.trace && result.trace.available) {
+      log(`  trace: ${result.trace.stats.classes} classes, ${result.trace.stats.methods} methods, ${result.trace.stats.routes} routes, ${result.trace.stats.looseEnds} loose ends`);
+    } else {
+      log('  trace: ' + (result.trace ? result.trace.reason : 'unavailable'));
+    }
+  } catch (e) {
+    log('  trace engine failed (non-fatal): ' + e.message);
+    result.trace = { available: false, reason: e.message };
   }
 
   return result;

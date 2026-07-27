@@ -30,6 +30,8 @@ import { impactOfFile, impactOfFunction, impactOfTable, traceData, traceRequest,
 import { initBrain, loadBrain, brainSummary, brainSearch, brainSimilar, getInsights, getTimeline, reindex, getHistory, memoryList, clearMemory, getPlugins } from '../brain/brain.js';
 import { answerIntent, conversationalMap } from '../intel/intent.js';
 import { productOverviewMessages, systemStoryMessages, tourStopMessages, journeyMessages, whyEdgeMessages, intentNarrativeMessages, scorecardMessages } from '../ai/intel-generators.js';
+import { buildTraceModel, investigateFeature, explainCalculation, traceVariable, getMethodDetail } from '../trace/index.js';
+import { traceExplainMessages } from '../ai/trace-generators.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIR = path.resolve(__dirname, '../../web');
@@ -301,6 +303,116 @@ async function handleAiIntel(req, res) {
   res.end();
 }
 
+// ---- Trace Engine endpoints (verified code investigation) ----
+// The full queryable model (with method bodies + Maps) is heavy and not
+// serialized to disk; rebuild + cache it in memory on demand from the repo dir.
+const TRACE_MODELS = new Map(); // id -> model (with live _sindex)
+async function getTraceModel(id) {
+  if (TRACE_MODELS.has(id)) return TRACE_MODELS.get(id);
+  const index = getCached(id);
+  if (!index) return null;
+  const dir = brainDirFor(id);
+  if (!dir) return null;
+  const model = await buildTraceModel(index, dir);
+  model._universalIndex = index;
+  TRACE_MODELS.set(id, model);
+  return model;
+}
+
+async function handleTraceSummary(req, res) {
+  const url = new URL(req.url, 'http://localhost');
+  const id = url.searchParams.get('id');
+  if (!id) return send(res, 400, { error: 'id query param required' });
+  const index = getCached(id);
+  if (!index) return send(res, 404, { error: 'index not found' });
+  // prefer the serialized summary on the index; fall back to (re)building
+  let summary = index.trace;
+  if (!summary || summary.available === undefined) {
+    const m = await getTraceModel(id);
+    summary = m ? { available: m.available, stats: m.stats, crossLayer: m.crossLayer, looseEnds: m.looseEnds, symbols: m.symbols } : { available: false };
+  }
+  return send(res, 200, summary);
+}
+
+async function handleTraceInvestigate(req, res) {
+  const body = await readBody(req);
+  const { id, query } = body;
+  if (!id || !query) return send(res, 400, { error: 'id and query required' });
+  const model = await getTraceModel(id);
+  if (!model) return send(res, 404, { error: 'index not found' });
+  if (!model.available) return send(res, 200, { available: false, reason: model.reason });
+  return send(res, 200, { available: true, ...investigateFeature(model, query) });
+}
+
+async function handleTraceExplain(req, res) {
+  const body = await readBody(req);
+  const { id, method, variable } = body;
+  if (!id || !method || !variable) return send(res, 400, { error: 'id, method, variable required' });
+  const model = await getTraceModel(id);
+  if (!model || !model.available) return send(res, 404, { error: 'trace unavailable' });
+  return send(res, 200, explainCalculation(model, method, variable));
+}
+
+async function handleTraceVariable(req, res) {
+  const body = await readBody(req);
+  const { id, method, variable, direction } = body;
+  if (!id || !method || !variable) return send(res, 400, { error: 'id, method, variable required' });
+  const model = await getTraceModel(id);
+  if (!model || !model.available) return send(res, 404, { error: 'trace unavailable' });
+  return send(res, 200, traceVariable(model, method, variable, direction || 'backward'));
+}
+
+async function handleTraceMethod(req, res) {
+  const url = new URL(req.url, 'http://localhost');
+  const id = url.searchParams.get('id');
+  const method = url.searchParams.get('method');
+  if (!id || !method) return send(res, 400, { error: 'id and method required' });
+  const model = await getTraceModel(id);
+  if (!model || !model.available) return send(res, 404, { error: 'trace unavailable' });
+  const d = getMethodDetail(model, method);
+  return d ? send(res, 200, d) : send(res, 404, { error: 'method not found' });
+}
+
+async function handleTraceSource(req, res) {
+  // return a source-code range for evidence display (file:line inspection)
+  const url = new URL(req.url, 'http://localhost');
+  const id = url.searchParams.get('id');
+  const file = url.searchParams.get('file');
+  const from = Math.max(1, parseInt(url.searchParams.get('from') || '1', 10));
+  const to = parseInt(url.searchParams.get('to') || String(from + 30), 10);
+  if (!id || !file) return send(res, 400, { error: 'id and file required' });
+  const dir = brainDirFor(id);
+  if (!dir) return send(res, 404, { error: 'repo dir unavailable' });
+  try {
+    const full = path.join(dir, file);
+    if (!full.startsWith(path.resolve(dir))) return send(res, 400, { error: 'invalid path' });
+    const lines = fs.readFileSync(full, 'utf8').split('\n');
+    const slice = lines.slice(from - 1, to);
+    return send(res, 200, { file, from, to: from - 1 + slice.length, lines: slice });
+  } catch (e) { return send(res, 404, { error: 'file not found' }); }
+}
+
+async function handleAiTraceExplain(req, res) {
+  const body = await readBody(req);
+  const { id, kind, config } = body;
+  const model = await getTraceModel(id);
+  if (!model || !model.available) return send(res, 404, { error: 'trace unavailable' });
+  if (!config || !config.model) return send(res, 400, { error: 'AI not configured' });
+  let payload;
+  if (kind === 'calculation') payload = explainCalculation(model, body.method, body.variable);
+  else if (kind === 'flow') { const r = investigateFeature(model, body.query || ''); payload = r.flows.find((f) => f.id === body.flowId) || r.flows[0]; }
+  else if (kind === 'variable') payload = traceVariable(model, body.method, body.variable, body.direction || 'backward');
+  else return send(res, 400, { error: 'unknown kind' });
+  const messages = traceExplainMessages(kind, payload, body);
+  if (!messages) return send(res, 404, { error: 'nothing to explain' });
+  sseInit(res);
+  try {
+    await chat({ ...config, stream: true, maxTokens: config.maxTokens || 1000 }, messages, (d) => sseSend(res, 'delta', { text: d }));
+    sseSend(res, 'done', {});
+  } catch (e) { sseSend(res, 'error', { message: e.message }); }
+  res.end();
+}
+
 // ---- Phase 4: Repository Brain endpoints ----
 function brainDirFor(id) { const c = CACHE.get(id); if (c && c.dir) return c.dir; const idx = getCached(id); return idx && idx.source && idx.source.brainDir; }
 
@@ -445,6 +557,13 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && p === '/api/intel') return await handleIntel(req, res);
     if (req.method === 'POST' && p === '/api/intel/query') return await handleIntelQuery(req, res);
     if (req.method === 'POST' && p === '/api/ai/intel') return await handleAiIntel(req, res);
+    if (req.method === 'GET' && p === '/api/trace2') return await handleTraceSummary(req, res);
+    if (req.method === 'POST' && p === '/api/trace2/investigate') return await handleTraceInvestigate(req, res);
+    if (req.method === 'POST' && p === '/api/trace2/explain') return await handleTraceExplain(req, res);
+    if (req.method === 'POST' && p === '/api/trace2/variable') return await handleTraceVariable(req, res);
+    if (req.method === 'GET' && p === '/api/trace2/method') return await handleTraceMethod(req, res);
+    if (req.method === 'GET' && p === '/api/trace2/source') return await handleTraceSource(req, res);
+    if (req.method === 'POST' && p === '/api/ai/trace') return await handleAiTraceExplain(req, res);
     if (req.method === 'GET') return serveStatic(req, res, p);
     return send(res, 404, { error: 'not found' });
   } catch (e) {
