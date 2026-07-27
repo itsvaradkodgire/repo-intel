@@ -1,0 +1,37 @@
+# Render Blueprint for the Repository Intelligence Platform.
+#
+# This app is a long-running Node HTTP server (NOT static/serverless): it shells
+# out to `git` to clone repositories and keeps analysis state in memory, so it
+# must run as a persistent Web Service. Render's native Node runtime includes a
+# `git` binary and a writable filesystem, which is exactly what this needs.
+#
+# One-click deploy: push this file, then in Render -> New -> Blueprint, select
+# this repo. (Free plan is fine; it has no persistent disk, so the clone cache is
+# ephemeral and rebuilt on restart, which is acceptable.)
+services:
+  - type: web
+    name: repo-intel
+    runtime: node
+    plan: free
+    branch: main
+    # Deterministic install from package-lock.json.
+    buildCommand: npm ci
+    startCommand: npm start
+    # Render injects PORT; the server reads process.env.PORT and binds 0.0.0.0.
+    # /healthz is a cheap liveness probe added for exactly this.
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      # Pin the Node version so web-tree-sitter (WASM) loads consistently.
+      - key: NODE_VERSION
+        value: 22.11.0
+      # git clone cache. On the free plan there is no persistent disk, so use a
+      # writable ephemeral location; the app recreates it as needed.
+      - key: REPO_INTEL_CACHE
+        value: /tmp/repo-intel-cache
+      # --- GitHub App (OPTIONAL: only needed to analyze PRIVATE repos) ---
+      # Add these in the Render dashboard as secrets; leave unset for public repos.
+      - key: GITHUB_APP_ID
+        sync: false
+      - key: GITHUB_APP_PRIVATE_KEY
+        sync: false

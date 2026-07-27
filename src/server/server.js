@@ -542,6 +542,11 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   const p = url.pathname;
   try {
+    // Liveness/health probe (used by Render/Railway/Fly health checks). Cheap and
+    // dependency-free so the platform can confirm the process is up.
+    if (req.method === 'GET' && (p === '/healthz' || p === '/api/health')) {
+      return send(res, 200, { ok: true, service: 'repo-intel', uptime: process.uptime() });
+    }
     if (req.method === 'POST' && p === '/api/analyze') return await handleAnalyze(req, res);
     if (req.method === 'GET' && p.startsWith('/api/index/')) {
       const index = getCached(p.split('/').pop());
@@ -596,7 +601,7 @@ process.on('unhandledRejection', (err) => {
 process.on('uncaughtException', (err) => {
   console.error('[uncaughtException]', err && err.stack || err);
 });
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n  Repository Intelligence Platform`);
   console.log(`  → http://localhost:${PORT}\n`);
 });
