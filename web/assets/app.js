@@ -69,7 +69,7 @@ function loadIndex(id){
     var bi=document.querySelector('#brand .badge-ic');if(bi)bi.textContent=(repoName[0]||'R').toUpperCase();
     document.getElementById('brand-meta').textContent=D.languages.slice(0,3).map(function(l){return l.label;}).join(' · ')+' · '+num(D.manifest.counts.loc)+' LOC';
     buildNav();setupSearch();
-    if(!location.hash||location.hash==='#')location.hash='#/home';
+    if(!location.hash||location.hash==='#')location.hash=(D.trace&&D.trace.available)?'#/investigate':'#/home';
     render();
   });
 }
@@ -107,7 +107,7 @@ function render(){
   var mainEl=document.getElementById('sidebar');if(mainEl)mainEl.classList.remove('open');
 }
 function setCrumbs(r){
-  var labels={home:'Home',map:'Repository Map',dashboard:'Dashboard',architecture:'Architecture',files:'Files',functions:'Functions',classes:'Classes',apis:'API Explorer',database:'Database',flows:'Business Flows',graph:'Dependency Graph',quality:'Code Quality',security:'Security',deps:'Dependencies',ai:'AI Assistant',settings:'Settings',compare:'Compare',semantic:'Modules & Domains',health:'Health & Quality',overview:'AI Overview',learn:'Learn Repository',trace:'Trace & Impact',commit:'Commit Intelligence',sgraph:'Semantic Graph',timemachine:'Time Machine',brain:'Knowledge Store',search:'Semantic Search',insights:'Insights',timeline:'Timeline',system:'System Map',product:'Overview',capmap:'Capabilities',journeys:'User Journeys',stories:'System Stories',tour:'Guided Tour',ask:'Ask a Question',scorecard:'Product Scorecard',beginner:'Beginner Mode'};
+  var labels={home:'Home',investigate:'Investigate',feature:'Feature Flow',map:'Repository Map',dashboard:'Dashboard',architecture:'Architecture',files:'Files',functions:'Functions',classes:'Classes',apis:'API Explorer',database:'Database',flows:'Business Flows',graph:'Dependency Graph',quality:'Code Quality',security:'Security',deps:'Dependencies',ai:'AI Assistant',settings:'Settings',compare:'Compare',semantic:'Modules & Domains',health:'Health & Quality',overview:'AI Overview',learn:'Learn Repository',trace:'Trace & Impact',commit:'Commit Intelligence',sgraph:'Semantic Graph',timemachine:'Time Machine',brain:'Knowledge Store',search:'Semantic Search',insights:'Insights',timeline:'Timeline',system:'System Map',product:'Overview',capmap:'Capabilities',journeys:'User Journeys',stories:'System Stories',tour:'Guided Tour',ask:'Ask a Question',scorecard:'Product Scorecard',beginner:'Beginner Mode'};
   var label=labels[r.page]||r.page;
   var html='<span class="c-link crumb" onclick="RINAV(\'home\')">Home</span>'+(r.page!=='home'?' <span style="color:var(--faint2)">/</span> '+esc(label):'');
   if(r.arg)html+=' <span style="color:var(--faint2)">/</span> <span class="mono">'+esc(baseName(decodeURIComponent(r.arg)))+'</span>';
@@ -121,7 +121,8 @@ window.addEventListener('hashchange',render);
 // and reachable (via these groups or the command palette / search).
 var NAV=[
   {page:'home',label:'Home',ic:'\u2302'},
-  {page:'map',label:'Repository Map',ic:'\u25C9',flag:true},
+  {page:'investigate',label:'Investigate',ic:'\u2315',flag:true},
+  {page:'map',label:'Repository Map',ic:'\u25C9'},
   {sec:'Understand',exp:'understand',hint:'What is this? How is it built?'},
   {page:'product',label:'Overview',ic:'\u2637',exp:'understand'},
   {page:'architecture',label:'Architecture',ic:'\u25F0',exp:'understand'},

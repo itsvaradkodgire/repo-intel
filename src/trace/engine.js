@@ -174,8 +174,9 @@ function buildFlowEvidence(sindex, members) {
     if (/calc|comput|process|generate/.test(lc(m.name)) && (m.locals.some((l) => l.init && l.init.op) || m.returns.some((r) => r.expr && r.expr.op))) {
       if (!ev.calculators.includes(m.containingClass.split('.').pop())) ev.calculators.push(m.containingClass.split('.').pop());
     }
-    // formulas
-    for (const l of m.locals) if (l.init && l.init.op) ev.formulas.push({ result: l.name, expr: fmt(l.init), file: m.file, line: l.line });
+    // formulas (record the owning method so the UI can explain against the
+    // method that actually defines the value, not the flow entry)
+    for (const l of m.locals) if (l.init && l.init.op) ev.formulas.push({ result: l.name, expr: fmt(l.init), file: m.file, line: l.line, method: m.id });
     // persistence: recognize repository save/persist/insert calls by raw name
     // (JpaRepository.save is inherited and not in our symbol index, so check
     // the raw call sites too, not just resolved call-graph edges).

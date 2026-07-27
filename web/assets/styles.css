@@ -315,3 +315,47 @@ h1.pt{font-size:21px;letter-spacing:-.01em}
 .nav-item.flag.active{background:linear-gradient(90deg,var(--accent),#4a90ff);color:#06101f;border-color:transparent}
 .nav-item.flag .ic{color:var(--accent2)}
 .nav-item.flag.active .ic{color:#06101f}
+
+/* ======================================================================
+   Trace Engine — Investigation UI (additive)
+   ====================================================================== */
+.invq{display:flex;gap:10px;margin:6px 0 12px}
+.invq-input{flex:1;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:15px 18px;font-size:16px;outline:none}
+.invq-input:focus{border-color:var(--accent)}
+.inv-sugg{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px}
+.inv-sugg .chip{padding:6px 12px;font-size:12.5px;font-family:var(--sans)}
+.flow-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:15px 17px;margin-bottom:12px;cursor:pointer;transition:transform .14s var(--ease),border-color .14s var(--ease),box-shadow .14s var(--ease)}
+.flow-card:hover{transform:translateY(-2px);border-color:var(--accent);box-shadow:var(--shadow-2)}
+.flow-card-head{display:flex;align-items:center;gap:10px}
+.flow-name{font-weight:650;font-size:15px}
+.ev-badges{display:flex;flex-wrap:wrap;gap:6px}
+.ev-badge{font-size:10.5px;font-family:var(--mono);background:var(--panel2);border:1px solid var(--border);border-radius:5px;padding:2px 8px;color:var(--dim)}
+
+/* trace chain */
+.trace-chain{display:flex;flex-direction:column;gap:2px}
+.trace-node{display:flex;flex-direction:column;align-items:flex-start}
+.trace-arrow{color:var(--faint2);font-size:15px;padding-left:14px}
+.trace-node-body{background:var(--panel2);border:1px solid var(--border-soft);border-radius:8px;padding:7px 12px;font-size:12.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;width:100%}
+
+/* formulas */
+.formula-list{display:flex;flex-direction:column;gap:4px}
+.formula-row{display:flex;align-items:center;gap:10px;padding:7px 11px;background:var(--panel2);border:1px solid var(--border-soft);border-radius:8px;margin:3px 0}
+.formula-eq{font-size:13px;color:var(--text)}
+.formula-eq{flex:1}
+
+/* clickable code evidence */
+.code-ref{font-family:var(--mono);font-size:11px;color:var(--accent);cursor:pointer;border-bottom:1px dashed var(--accent);white-space:nowrap}
+.code-ref:hover{background:#12233f}
+.code-ref:empty::before{content:'\2197';}
+
+/* source popover */
+#src-pop{position:fixed;inset:0;background:rgba(4,8,15,.6);backdrop-filter:blur(3px);z-index:210;display:none;align-items:center;justify-content:center;padding:6vh 20px}
+.src-pop-inner{width:min(820px,94vw);max-height:80vh;background:var(--panel2);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow-3);display:flex;flex-direction:column;overflow:hidden}
+.src-pop-head{display:flex;align-items:center;justify-content:space-between;padding:11px 15px;border-bottom:1px solid var(--border)}
+.src-pop-x{cursor:pointer;font-size:18px;color:var(--faint2)}
+.src-pop-body{overflow:auto;padding:8px 0}
+.src-code{font-family:var(--mono);font-size:12.5px}
+.src-line{display:flex;gap:12px;padding:1px 15px;white-space:pre}
+.src-line.hot{background:#14243f}
+.src-line .src-ln{color:var(--faint2);width:36px;text-align:right;flex-shrink:0;user-select:none}
+.src-line code{color:var(--text)}

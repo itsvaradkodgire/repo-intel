@@ -69,6 +69,7 @@ route('home',function(content){
     e.addEventListener('keydown',function(ev){if(ev.key==='Enter')nav(go);});
     qaGrid.appendChild(e);
   }
+  if(D().trace&&D().trace.available)qa('\u2315','Investigate the code','Ask how a feature works or where a value comes from. Verified from code.','investigate','#5b9dff');
   qa('\u25C9','Open the Repository Map','See every system and how they connect. One map, many lenses.','map','#5b9dff');
   if(AI().aiReady())qa('\u2727','Ask the AI Assistant','Ask anything about how this code works. Grounded, cited answers.','ai','#a98bff');
   else qa('\u2727','Turn on the AI Assistant','Bring any provider for grounded, cited explanations. Optional.','settings','#a98bff');
