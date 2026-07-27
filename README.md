@@ -395,16 +395,31 @@ value and asks "how is this calculated?", "where does this come from?", "what
 happens to it?", and the system answers with **verified code evidence**, not AI
 guesses. Static analysis produces the evidence; AI only explains it.
 
-Reference language: **Java / Spring** (deepest analysis). Other languages keep
-their existing support and degrade gracefully (`trace.available = false`).
+Languages with **deep investigation** (symbols + call graph + data flow +
+calculations + cross-layer): **Java, TypeScript, TSX, JavaScript**. Every other
+language keeps structural navigation and degrades gracefully. Coverage is shown
+per-language in the Investigate view as a **capability table** derived from
+analyzer support (never hardcoded), so users see exactly what each language gets.
 
-Pipeline (`src/trace/`, all additive):
+Pipeline (`src/trace/`, all additive). A **language adapter** (`adapters.js`)
+maps each language to an analyzer that emits ONE normalized per-file model; the
+symbol index, lineage, engine, server, and UI are all language-independent, so
+Java and TypeScript feed the **same Evidence Graph** (cross-language traces work).
 - **java-analyzer.js** — structural tree-sitter walk extracting, with file:line:
   classes/interfaces/enums/records, Spring stereotypes (`@RestController`,
   `@Service`, `@Repository`, `@Component`, `@Entity`), JPA `@Table`/`@Column`
   mappings, fields+types, methods (typed params/return/annotations), and method
   bodies (locals, assignments, calls-with-receivers, returns, and the control-flow
   condition each sits under).
+- **ts-analyzer.js** — the TypeScript/TSX/JS counterpart (tree-sitter, no regex).
+  Emits the identical normalized model: typed symbols, interfaces as DTOs,
+  module-scope functions/consts wrapped in a synthetic `module` class, real AST
+  formulas, destructuring, arrow/expression-body functions, ternaries (with their
+  predicate captured as the assignment's condition), async/await, React component
+  detection, `fetch`/`axios` **API calls**, **Supabase/Prisma** DB access (table +
+  projected columns, via a two-pass method-chain resolver), and Next.js/Express
+  **routes**. `.select('a,b')` columns and `.insert({...})` writes are captured;
+  member reads like `employee.monthlySalary` resolve to `employees.monthly_salary`.
 - **symbol-index.js** — cross-file symbol index with stable IDs + FQNs, per-method
   variable typing, and a **type-aware call graph**: receiver variable → its
   declared type → method on that class; interface receiver → implementations
@@ -432,14 +447,37 @@ suggested investigation types, and ranked candidate flows; each flow opens a
 detail view with tabs (Overview / Flow / Calculations / Variables / API / Database
 / Code / Issues), Explain-Calculation, backward/forward variable tracing, and a
 clickable **code-evidence popover** that opens the real source. Investigation is
-the default landing for Java repos; every prior page still works.
+the default landing when any deeply-analyzable language is present; every prior
+page still works.
 
-Validation (reference repo `spring-hrms`, an HRMS payroll app built for this):
-- `docs/TRACE_ENGINE_AUDIT.md` — the required pre-implementation audit.
-- `trace-accept.mjs` — the 5 acceptance tests: **18/18 checks pass**. "How is
-  payroll calculated?" returns 3 real candidate flows (persisting run, preview,
-  and a non-"payroll"-named CompensationProcessor pipeline) with formulas, DB
-  columns, and conditions; value origin reaches `employees.monthly_salary`;
-  forward tracing reaches persisted columns + response DTO; the two
-  `PayrollService` implementations are kept separate; loose-ends are found.
-- `ui-smoke.cjs` — headless DOM smoke of the Investigation UI: **8/8 pass**.
+Validation (reference repos built for this: `spring-hrms` in Java, `ts-hrms` in
+TypeScript/Next.js/React/Supabase, mirroring the same payroll formulas):
+- `docs/TRACE_ENGINE_AUDIT.md` and `docs/GITHUB_TYPESCRIPT_IMPLEMENTATION_AUDIT.md`
+  — the required pre-implementation audits.
+- `trace-accept.mjs` (Java) — **18/18 pass**. "How is payroll calculated?" returns
+  3 real candidate flows (persisting run, preview, and a non-"payroll"-named
+  CompensationProcessor pipeline) with formulas, DB columns, and conditions; value
+  origin reaches `employees.monthly_salary`; forward tracing reaches persisted
+  columns + response DTO; the two `PayrollService` implementations stay separate;
+  loose-ends are found.
+- `trace-accept-ts.mjs` (TypeScript) — **17/17 pass**. Reproduces all 6 payroll
+  formulas from the AST; `monthlySalary` origin resolves to `employees.monthly_salary`;
+  the ternary guard `worked_hours < HALF_DAY_THRESHOLD` is captured; the payroll
+  flow is recognized as persisting via Supabase `.insert()` to `employees`+`payroll`
+  with the projected columns.
+- `ui-smoke.cjs` — headless DOM smoke of the Investigation UI, language-agnostic:
+  **8/8 on Java and 8/8 on TypeScript**.
+
+### Private repositories via a GitHub App (`src/github/`)
+
+Private repos are analyzed without pasting a PAT or storing long-lived
+credentials. A read-only **GitHub App** (Contents:Read, Metadata:Read) is proven
+with a short-lived RS256 **App JWT** (Node `crypto`, no deps), exchanged for a
+~1h **installation token** scoped to the specific repo. The token lives only in
+server memory (cached + rotated before expiry), is passed to `git` as an
+**ephemeral `http.extraHeader`** (never in `.git/config`, argv, logs, or the
+remote URL), and no private source ever reaches the browser. App-login is kept
+separate from repo-installation. `resolveSource()` probes visibility anonymously
+so public repos are unchanged; a missing App config on a private repo returns an
+actionable error. See `src/github/README.md`. Offline crypto/plumbing is covered
+by `github-selftest.mjs` — **16/16 pass**.
